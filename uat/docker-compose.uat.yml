@@ -1,0 +1,68 @@
+version: '3.8'
+
+networks:
+  webnet:
+    external: true
+    name: global-web-network
+
+volumes:
+  mysql-uat-data:
+  laravel-uat-storage:
+
+
+services:
+  frontend-uat:
+    build:
+      context: ../../cloud-haven-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_BACKEND_URL: "https://uat-api.yourdomain.com"
+    image: cloud-haven-web:uat
+    container_name: frontend-uat
+    networks: [ webnet ]
+
+  backend-uat:
+    build:
+      context: ../../cloud-haven-api
+      dockerfile: Dockerfile
+    image: cloud-haven-api:uat
+    container_name: backend-uat
+    env_file: ./env/uat.backend.env
+    depends_on: [ mysql-uat, redis-uat ]
+    volumes:
+      - laravel-uat-storage:/var/www/html/storage
+    networks: [ webnet ]
+
+  queue-uat:
+    image: cloud-haven-api:uat
+    container_name: queue-uat
+    env_file: ./env/uat.backend.env
+    command: php artisan queue:work --verbose --tries=3 --timeout=90
+    depends_on: [ backend-uat, redis-uat ]
+    networks: [ webnet ]
+    restart: always
+
+  scheduler-uat:
+    image: cloud-haven-api:uat
+    container_name: scheduler-uat
+    env_file: ./env/uat.backend.env
+    command: php artisan schedule:work
+    depends_on: [ backend-uat, redis-uat ]
+    networks: [ webnet ]
+    restart: always
+
+  mysql-uat:
+    image: mysql:8.4
+    container_name: mysql-uat
+    env_file: ./env/uat.mysql.env
+    volumes:
+      - mysql-uat-data:/var/lib/mysql
+    # optional bind only to droplet localhost for SSH tunneling
+    ports:
+      - "127.0.0.1:3307:3306"
+    networks: [ webnet ]
+
+  redis-uat:
+    image: redis:8.2-alpine
+    container_name: redis-uat
+    networks: [ webnet ]

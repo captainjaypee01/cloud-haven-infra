@@ -1,0 +1,76 @@
+name: Infra Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "prod or uat"
+        required: true
+        default: prod
+      service:
+        description: "frontend | backend | both"
+        required: true
+        default: both
+  repository_dispatch:
+    types: [deploy-request]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout infra
+        uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_SSH_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt
+            # ensure repos present
+            if [ ! -d cloud-haven-infra ]; then git clone git@github.com:YOUR_ORG/cloud-haven-infra.git; fi
+            if [ ! -d cloud-haven ]; then git clone git@github.com:YOUR_ORG/cloud-haven.git; fi
+            if [ ! -d cloud-haven-api ]; then git clone git@github.com:YOUR_ORG/cloud-haven-api.git; fi
+
+            # update repos to latest (main for prod, uat for UAT)
+            ENV="${{ github.event.client_payload.env || inputs.env }}"
+            SERVICE="${{ github.event.client_payload.service || inputs.service }}"
+            FE_BRANCH=$([ "$ENV" = "prod" ] && echo main || echo uat)
+            BE_BRANCH=$([ "$ENV" = "prod" ] && echo main || echo uat)
+
+            cd cloud-haven && git fetch && git checkout $FE_BRANCH && git reset --hard origin/$FE_BRANCH && cd ..
+            cd cloud-haven-api && git fetch && git checkout $BE_BRANCH && git reset --hard origin/$BE_BRANCH && cd ..
+
+            # make shared network
+            docker network ls | grep -q global-web-network || docker network create global-web-network
+
+            if [ "$ENV" = "prod" ]; then
+              cd cloud-haven-infra/prod
+              if [ "$SERVICE" = "frontend" ]; then
+                docker compose -f docker-compose.prod.yml build frontend-prod
+                docker compose -f docker-compose.prod.yml up -d frontend-prod
+              elif [ "$SERVICE" = "backend" ]; then
+                docker compose -f docker-compose.prod.yml build backend-prod queue-prod scheduler-prod
+                docker compose -f docker-compose.prod.yml up -d backend-prod queue-prod scheduler-prod
+                docker compose -f docker-compose.prod.yml exec -T backend-prod php artisan migrate --force
+              else
+                docker compose -f docker-compose.prod.yml up -d --build
+                docker compose -f docker-compose.prod.yml exec -T backend-prod php artisan migrate --force
+              fi
+            else
+              cd cloud-haven-infra/uat
+              if [ "$SERVICE" = "frontend" ]; then
+                docker compose -f docker-compose.uat.yml build frontend-uat
+                docker compose -f docker-compose.uat.yml up -d frontend-uat
+              elif [ "$SERVICE" = "backend" ]; then
+                docker compose -f docker-compose.uat.yml build backend-uat queue-uat scheduler-uat
+                docker compose -f docker-compose.uat.yml up -d backend-uat queue-uat scheduler-uat
+                docker compose -f docker-compose.uat.yml exec -T backend-uat php artisan migrate --force
+              else
+                docker compose -f docker-compose.uat.yml up -d --build
+                docker compose -f docker-compose.uat.yml exec -T backend-uat php artisan migrate --force
+              fi
+            fi

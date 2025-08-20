@@ -1,0 +1,96 @@
+name: cloud-haven-dev
+
+networks:
+  devnet:
+    name: cloud-haven-devnet
+
+volumes:
+  mysql-dev-data:
+
+services:
+  # ---------------- Frontend (React 19 + Vite / Node 22) ----------------
+  frontend:
+    image: node:22-alpine
+    container_name: cloud-haven-dev-frontend
+    working_dir: /usr/src/app
+    stdin_open: true
+    tty: true
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ../../cloud-haven:/usr/src/app
+      - /usr/src/app/node_modules
+      # ensure Vite uses API at 8080
+      - ../../cloud-haven/.env.development:/usr/src/app/.env.development:ro
+    command: sh -lc "(test -f package-lock.json && npm ci || npm install) && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"     # Vite dev server
+    networks: [devnet]
+
+  # ---------------- Backend (Laravel 12 API / PHP 8.4) ----------------
+  backend:
+    build:
+      context: ../../cloud-haven-api
+      dockerfile: Dockerfile.dev
+    container_name: cloud-haven-dev-backend
+    env_file:
+      - ../../cloud-haven-api/.env.dev.docker   # create from example & fill
+    volumes:
+      - ../../cloud-haven-api:/var/www/html
+    depends_on:
+      - mysql
+      - redis
+    ports:
+      - "8080:80"       # Apache in container → host 8080
+    networks: [devnet]
+
+  queue:
+    build:
+      context: ../../cloud-haven-api
+      dockerfile: Dockerfile.dev
+    container_name: cloud-haven-dev-queue
+    env_file:
+      - ../../cloud-haven-api/.env.dev.docker
+    command: php artisan queue:work --verbose --tries=3 --timeout=90
+    volumes:
+      - ../../cloud-haven-api:/var/www/html
+    depends_on:
+      - backend
+      - redis
+    networks: [devnet]
+
+  scheduler:
+    build:
+      context: ../../cloud-haven-api
+      dockerfile: Dockerfile.dev
+    container_name: cloud-haven-dev-scheduler
+    env_file:
+      - ../../cloud-haven-api/.env.dev.docker
+    command: php artisan schedule:work
+    volumes:
+      - ../../cloud-haven-api:/var/www/html
+    depends_on:
+      - backend
+      - redis
+    networks: [devnet]
+
+  # ---------------- Data Stores ----------------
+  mysql:
+    image: mysql:8.4
+    container_name: cloud-haven-dev-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: devroot
+      MYSQL_DATABASE: cloudhaven_dev
+      MYSQL_USER: cloudhaven
+      MYSQL_PASSWORD: devpass
+    volumes:
+      - mysql-dev-data:/var/lib/mysql
+    # bind to a non-conflicting host port (Workbench likely owns 3306 already)
+    ports:
+      - "33070:3306"    # connect from host via localhost:33060
+    networks: [devnet]
+
+  redis:
+    image: redis:8.2-alpine
+    container_name: cloud-haven-dev-redis
+    networks: [devnet]
