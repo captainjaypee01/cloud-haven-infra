@@ -1,0 +1,78 @@
+# Let Nginx resolve Docker service names at request time
+# (127.0.0.11 is Docker’s embedded DNS in containers)
+resolver 127.0.0.11 ipv6=off valid=10s;
+
+# PROD
+server { 
+    listen 80;  
+    server_name netaniadelaiya.com; 
+    return 301 https://$host$request_uri; 
+}
+server {
+    listen 443 ssl http2; 
+    server_name netaniadelaiya.com;
+    ssl_certificate     /etc/letsencrypt/live/netaniadelaiya.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/netaniadelaiya.com/privkey.pem;
+    set $upstream frontend-prod;
+    location / {
+        proxy_set_header Host $host; 
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_pass http://$upstream;
+    }
+}
+
+server { 
+    listen 80;  
+    server_name api.netaniadelaiya.com; 
+    return 301 https://$host$request_uri; 
+}
+
+server {
+    listen 443 ssl http2; 
+    server_name api.netaniadelaiya.com;
+    ssl_certificate     /etc/letsencrypt/live/api.netaniadelaiya.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.netaniadelaiya.com/privkey.pem;
+    set $upstream backend-prod;
+    location / {
+        proxy_set_header Host $host; 
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_pass http://$upstream;
+    }
+}
+
+# UAT (these won’t break startup; if UAT is down, only UAT hosts 502)
+server { 
+    listen 80;  
+    server_name uat.netaniadelaiya.com; 
+    return 301 https://$host$request_uri; 
+}
+server {
+    listen 443 ssl http2; 
+    server_name uat.netaniadelaiya.com;
+    ssl_certificate     /etc/letsencrypt/live/uat.netaniadelaiya.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/uat.netaniadelaiya.com/privkey.pem;
+    set $upstream frontend-uat;
+    location / {
+        proxy_set_header Host $host; 
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_pass http://$upstream;
+    }
+}
+
+server { 
+    listen 80;  
+    server_name uat-api.netaniadelaiya.com; 
+    return 301 https://$host$request_uri; 
+}
+server {
+    listen 443 ssl http2; 
+    server_name uat-api.netaniadelaiya.com;
+    ssl_certificate     /etc/letsencrypt/live/uat-api.netaniadelaiya.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/uat-api.netaniadelaiya.com/privkey.pem;
+    set $upstream backend-uat;
+    location / {
+        proxy_set_header Host $host; 
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_pass http://$upstream;
+    }
+}
