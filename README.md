@@ -43,6 +43,7 @@ The proxy config already has the 80→443 redirects and `ssl_certificate` paths.
 
 
 # ensure required dirs exist in the mounted volume and set correct owner (www-data uid=33)
+```bash
 cd /opt/code/cloud-haven-infra/prod
 
 docker compose -f docker-compose.yml exec -T backend-prod bash -lc \
@@ -52,11 +53,29 @@ docker compose -f docker-compose.yml exec -T backend-prod bash -lc \
 
 # (optional) initialize volume from the host side too — persists even if the container is recreated
 docker run --rm -v laravel-prod-storage:/data alpine sh -c "chown -R 33:33 /data && chmod -R 775 /data"
+```
 
-
-Rebuild + restart the frontend image without cache so the new env is baked in:
-
+# Rebuild + restart the frontend image without cache so the new env is baked in:
+```bash
 cd /opt/code/cloud-haven-infra/prod
 docker compose -f docker-compose.yml build frontend-prod --no-cache
 docker compose -f docker-compose.yml up -d frontend-prod
 docker exec -t nginx-proxy nginx -s reload
+```
+
+# How to see proxy errors quickly
+```bash
+# show why it exited
+docker logs --tail=200 nginx-proxy
+
+# run in foreground to watch it fail
+cd /opt/code/cloud-haven-infra/proxy
+docker compose -f docker-compose.proxy.yml up nginx-proxy
+
+# validate config without starting the service
+docker run --rm \
+  -v /opt/code/cloud-haven-infra/proxy/nginx/reverseproxy.prod.only.conf:/etc/nginx/conf.d/default.conf:ro \
+  -v /etc/letsencrypt:/etc/letsencrypt:ro \
+  nginx:1.28-alpine nginx -t
+
+```
