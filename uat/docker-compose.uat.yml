@@ -16,6 +16,7 @@ services:
       args:
         VITE_BUILD_MODE: "uat"
     image: cloud-haven-web:uat
+    env_file: ./env/frontend.env.uat
     container_name: frontend-uat
     networks: [ webnet ]
 
