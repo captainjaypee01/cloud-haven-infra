@@ -40,3 +40,23 @@ The proxy config already has the 80→443 redirects and `ssl_certificate` paths.
 > ```bash
 > (crontab -l 2>/dev/null; echo "0 3 * * 0 certbot renew --post-hook 'docker exec nginx-proxy nginx -s reload' >/var/log/certbot-renew.log 2>&1") | crontab -
 > ```
+
+
+# ensure required dirs exist in the mounted volume and set correct owner (www-data uid=33)
+cd /opt/code/cloud-haven-infra/prod
+
+docker compose -f docker-compose.yml exec -T backend-prod bash -lc \
+'mkdir -p storage/logs storage/framework/{cache,data,sessions,testing,views} bootstrap/cache \
+ && chown -R www-data:www-data storage bootstrap/cache \
+ && chmod -R 775 storage bootstrap/cache'
+
+# (optional) initialize volume from the host side too — persists even if the container is recreated
+docker run --rm -v laravel-prod-storage:/data alpine sh -c "chown -R 33:33 /data && chmod -R 775 /data"
+
+
+Rebuild + restart the frontend image without cache so the new env is baked in:
+
+cd /opt/code/cloud-haven-infra/prod
+docker compose -f docker-compose.yml build frontend-prod --no-cache
+docker compose -f docker-compose.yml up -d frontend-prod
+docker exec -t nginx-proxy nginx -s reload
