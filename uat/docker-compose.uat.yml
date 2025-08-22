@@ -16,7 +16,7 @@ services:
       context: ../../cloud-haven-frontend
       dockerfile: Dockerfile
       args:
-        VITE_BACKEND_URL: "https://uat-api.yourdomain.com"
+        VITE_BUILD_MODE: "uat"
     image: cloud-haven-web:uat
     container_name: frontend-uat
     networks: [ webnet ]
@@ -56,7 +56,7 @@ services:
     container_name: mysql-uat
     env_file: ./env/uat.mysql.env
     volumes:
-      - mysql-uat-data:/var/lib/mysql
+      - ${MYSQL_PROD_DATA:-${VOLUME_ROOT}/mysql/prod}:/var/lib/mysql
     # optional bind only to droplet localhost for SSH tunneling
     ports:
       - "127.0.0.1:3307:3306"

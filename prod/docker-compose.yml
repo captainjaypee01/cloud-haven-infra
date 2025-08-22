@@ -15,7 +15,7 @@ services:
       context: ../../cloud-haven-frontend
       dockerfile: Dockerfile
       args:
-        VITE_BACKEND_URL: "https://api.yourdomain.com"
+        VITE_BUILD_MODE: "production"
     image: cloud-haven-web:prod
     container_name: frontend-prod
     networks: [ webnet ]
@@ -55,7 +55,7 @@ services:
     container_name: mysql-prod
     env_file: ./env/prod.mysql.env
     volumes:
-      - mysql-prod-data:/var/lib/mysql
+      - ${MYSQL_PROD_DATA:-${VOLUME_ROOT}/mysql/prod}:/var/lib/mysql
     # optional: bind to droplet localhost for SSH tunneling
     ports:
       - "127.0.0.1:3306:3306"
