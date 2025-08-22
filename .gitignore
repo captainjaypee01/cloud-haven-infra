@@ -2,8 +2,8 @@ uat/env/uat.*.env
 prod/env/prod.*.env
 dev/env/dev.*.env
 
-uat/*.env
-prod/*.env
-dev/*.env
+uat/.env
+prod/.env
+dev/.env
 
 proxy/nginx/reverseproxy.conf
