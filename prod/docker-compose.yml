@@ -1,5 +1,6 @@
 networks:
   webnet:
+    external: true
     name: global-web-network
 
 volumes:
