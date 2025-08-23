@@ -84,3 +84,30 @@ docker run --rm \
 ```bash
 docker exec nginx-proxy nginx -t && docker exec nginx-proxy nginx -s reload
 ```
+
+
+## API
+
+## Set APP_KEY the right way for Docker
+Do not run php artisan key:generate to write into .env (there likely isn’t a .env in the container).
+Instead, generate a key and put it in your compose env file.
+
+```bash
+# show a key (don’t write .env)
+docker exec backend-prod php artisan key:generate --show
+# copy output like: base64:xxxxxxxxxxxxxxxxxx
+```
+Open ./env/prod.backend.env and ensure you have:
+
+```bash
+docker compose up -d --force-recreate backend-prod queue-prod scheduler-prod
+
+docker exec backend-prod printenv APP_KEY
+docker exec backend-prod printenv DB_HOST
+```
+
+3) Run migrations (and storage link)
+```bash
+docker exec backend-prod php artisan migrate --force
+docker exec backend-prod php artisan storage:link || true
+```
