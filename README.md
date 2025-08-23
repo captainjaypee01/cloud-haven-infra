@@ -79,3 +79,8 @@ docker run --rm \
   nginx:1.28-alpine nginx -t
 
 ```
+
+# NGINX Test and Reload
+```bash
+docker exec nginx-proxy nginx -t && docker exec nginx-proxy nginx -s reload
+```
