@@ -15,7 +15,6 @@ services:
       args:
         VITE_BUILD_MODE: "production"
     image: cloud-haven-web:prod
-    env_file: ./env/frontend.env.production
     container_name: frontend-prod
     networks: [ webnet ]
 

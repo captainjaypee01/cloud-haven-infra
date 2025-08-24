@@ -7,7 +7,6 @@ volumes:
   mysql-uat-data:
   laravel-uat-storage:
 
-
 services:
   frontend-uat:
     build:
@@ -16,7 +15,6 @@ services:
       args:
         VITE_BUILD_MODE: "uat"
     image: cloud-haven-web:uat
-    env_file: ./env/frontend.env.uat
     container_name: frontend-uat
     networks: [ webnet ]
 
