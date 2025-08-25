@@ -27,8 +27,8 @@ docker stop nginx-proxy
 # obtain certs (adjust domains)
 sudo apt-get install -y certbot
 sudo certbot certonly --standalone \
-  -d app.netaniadelaiya.com -d api.netaniadelaiya.com \
-  -d uat-app.netaniadelaiya.com -d uat-api.netaniadelaiya.com
+  -d netaniadelaiya.com -d www.netaniadelaiya.com \
+  -d api.netaniadelaiya.com -d uat.netaniadelaiya.com -d uat-api.netaniadelaiya.com
 
 # start proxy and reload
 docker start nginx-proxy
