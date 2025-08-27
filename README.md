@@ -51,6 +51,11 @@ docker compose -f docker-compose.yml exec -T backend-prod bash -lc \
  && chown -R www-data:www-data storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache'
 
+docker compose -f docker-compose.uat.yml exec -T backend-uat bash -lc \
+'mkdir -p storage/logs storage/framework/{cache,data,sessions,testing,views} bootstrap/cache \
+ && chown -R www-data:www-data storage bootstrap/cache \
+ && chmod -R 775 storage bootstrap/cache'
+
 # (optional) initialize volume from the host side too — persists even if the container is recreated
 docker run --rm -v laravel-prod-storage:/data alpine sh -c "chown -R 33:33 /data && chmod -R 775 /data"
 ```
