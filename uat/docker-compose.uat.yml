@@ -22,6 +22,8 @@ services:
     build:
       context: ../../cloud-haven-api
       dockerfile: Dockerfile
+      args:
+        COMPOSER_DEV: "true"
     image: cloud-haven-api:uat
     container_name: backend-uat
     env_file: ./env/uat.backend.env
