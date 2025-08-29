@@ -31,6 +31,9 @@ services:
     volumes:
       - laravel-uat-storage:/var/www/html/storage
     networks: [ webnet ]
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   queue-uat:
     image: cloud-haven-api:uat
@@ -40,6 +43,9 @@ services:
     depends_on: [ backend-uat, redis-uat ]
     networks: [ webnet ]
     restart: always
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   scheduler-uat:
     image: cloud-haven-api:uat

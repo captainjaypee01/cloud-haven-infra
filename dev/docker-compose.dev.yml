@@ -9,7 +9,7 @@ volumes:
 
 services:
   # ---------------- Frontend (React 19 + Vite / Node 22) ----------------
-  frontend:
+  frontend-dev:
     image: node:22-alpine
     container_name: cloud-haven-dev-frontend
     working_dir: /usr/src/app
@@ -28,7 +28,7 @@ services:
     networks: [devnet]
 
   # ---------------- Backend (Laravel 12 API / PHP 8.4) ----------------
-  backend:
+  backend-dev:
     build:
       context: ../../cloud-haven-api
       dockerfile: Dockerfile.dev
@@ -44,7 +44,7 @@ services:
       - "8080:80"       # Apache in container → host 8080
     networks: [devnet]
 
-  queue:
+  queue-dev:
     build:
       context: ../../cloud-haven-api
       dockerfile: Dockerfile.dev
@@ -59,7 +59,7 @@ services:
       - redis
     networks: [devnet]
 
-  scheduler:
+  scheduler-dev:
     build:
       context: ../../cloud-haven-api
       dockerfile: Dockerfile.dev

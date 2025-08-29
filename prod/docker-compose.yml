@@ -29,6 +29,9 @@ services:
     volumes:
       - laravel-prod-storage:/var/www/html/storage
     networks: [ webnet ]
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   queue-prod:
     image: cloud-haven-api:prod
@@ -38,6 +41,9 @@ services:
     depends_on: [ backend-prod, redis-prod ]
     networks: [ webnet ]
     restart: always
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   scheduler-prod:
     image: cloud-haven-api:prod
