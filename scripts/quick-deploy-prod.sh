@@ -67,11 +67,11 @@ print_status "Waiting for containers to be ready..."
 sleep 15
 
 # Check if containers are running
-if docker-compose ps | grep -q "Up"; then
+if docker compose ps | grep -q "Up"; then
     print_status "✅ Production containers are running successfully"
 else
     print_error "❌ Some production containers failed to start"
-    docker-compose ps
+    docker compose ps
     exit 1
 fi
 
@@ -105,5 +105,5 @@ echo "   1. Clear your browser cache (Ctrl+Shift+Delete)"
 echo "   2. Try incognito/private browsing"
 echo "   3. Wait 2-3 minutes for all services to fully start"
 
-print_status "To view logs: docker-compose logs -f"
-print_status "To check container status: docker-compose ps"
+print_status "To view logs: docker compose logs -f"
+print_status "To check container status: docker compose ps"

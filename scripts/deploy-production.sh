@@ -85,11 +85,11 @@ print_status "Verifying deployment..."
 sleep 10
 
 # Check if containers are running
-if docker-compose ps | grep -q "Up"; then
+if docker compose ps | grep -q "Up"; then
     print_status "✅ Containers are running successfully"
 else
     print_error "❌ Some containers failed to start"
-    docker-compose ps
+    docker compose ps
     exit 1
 fi
 
