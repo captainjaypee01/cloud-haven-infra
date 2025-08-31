@@ -98,6 +98,7 @@ fi
 print_status "Verifying deployment..."
 sleep 10
 
+cd ../prod
 # Check if containers are running
 if docker compose ps | grep -q "Up"; then
     print_status "✅ Containers are running successfully"

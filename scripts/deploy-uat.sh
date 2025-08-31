@@ -63,6 +63,7 @@ fi
 print_status "Verifying UAT deployment..."
 sleep 10
 
+cd ../
 # Check if containers are running
 if docker compose -f uat/docker-compose.uat.yml ps | grep -q "Up"; then
     print_status "✅ UAT containers are running successfully"
