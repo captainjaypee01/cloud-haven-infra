@@ -72,7 +72,16 @@ else
     exit 1
 fi
 
-# 4. Test UAT endpoints
+# 4. Run database migrations
+print_status "Running UAT database migrations..."
+if docker exec backend-uat php artisan migrate --force; then
+    print_status "✅ UAT database migrations completed successfully"
+else
+    print_error "❌ UAT database migrations failed"
+    exit 1
+fi
+
+# 5. Test UAT endpoints
 print_status "Testing UAT endpoints..."
 UAT_URL="https://uat.netaniadelaiya.com"
 UAT_API_URL="https://uat-api.netaniadelaiya.com"
@@ -91,7 +100,7 @@ else
     print_error "❌ UAT API is not accessible"
 fi
 
-# 5. Verify robots.txt blocking
+# 6. Verify robots.txt blocking
 print_status "Verifying robots.txt blocking for UAT..."
 
 # Test UAT frontend robots.txt
@@ -123,7 +132,7 @@ else
     print_warning "⚠️  UAT might not have noindex meta tags. Consider adding them."
 fi
 
-# 6. Test search engine blocking
+# 7. Test search engine blocking
 print_status "Testing search engine blocking..."
 print_status "Please manually verify the following:"
 echo "   1. Visit https://uat.netaniadelaiya.com/robots.txt"
@@ -131,7 +140,7 @@ echo "   2. Verify it shows 'Disallow: /' for all user agents"
 echo "   3. Visit https://uat-api.netaniadelaiya.com/robots.txt"
 echo "   4. Verify it shows 'Disallow: /' for all user agents"
 
-# 7. Additional security measures
+# 8. Additional security measures
 print_status "Additional UAT security measures:"
 echo "   - UAT should not be indexed by search engines"
 echo "   - UAT should not appear in search results"

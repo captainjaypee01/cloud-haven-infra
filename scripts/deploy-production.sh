@@ -107,7 +107,16 @@ else
     exit 1
 fi
 
-# 6. Test endpoints
+# 6. Run database migrations
+print_status "Running database migrations..."
+if docker exec backend-prod php artisan migrate --force; then
+    print_status "✅ Database migrations completed successfully"
+else
+    print_error "❌ Database migrations failed"
+    exit 1
+fi
+
+# 7. Test endpoints
 print_status "Testing endpoints..."
 PROD_URL="https://www.netaniadelaiya.com"
 API_URL="https://api.netaniadelaiya.com"
@@ -126,12 +135,12 @@ else
     print_error "❌ Production API is not accessible"
 fi
 
-# 7. Clear CDN caches (if using Cloudflare)
+# 8. Clear CDN caches (if using Cloudflare)
 print_status "If you're using Cloudflare or any CDN, please clear cache:"
 echo "   - Cloudflare: Dashboard > Caching > Configuration > Purge Everything"
 echo "   - Other CDNs: Check your CDN provider's cache clearing options"
 
-# 8. Submit sitemap to search engines
+# 9. Submit sitemap to search engines
 print_status "Submitting sitemap to search engines..."
 SITEMAP_URL="$PROD_URL/sitemap.xml"
 
