@@ -76,11 +76,11 @@ sleep 10
 # Restart nginx proxy to apply new configurations
 print_status "Restarting nginx proxy to apply new configurations..."
 cd ../proxy
-if [ -f "docker-compose.yml" ]; then
-    docker compose restart nginx
+if [ -f "docker-compose.proxy.yml" ]; then
+    docker compose -f docker-compose.proxy.yml restart nginx-proxy
     print_status "✅ Nginx proxy restarted"
 else
-    print_warning "⚠️  Nginx proxy docker-compose.yml not found. Please restart nginx manually."
+    print_warning "⚠️  Nginx proxy docker-compose.proxy.yml not found. Please restart nginx manually."
 fi
 
 # 5. Verify deployment

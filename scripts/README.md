@@ -13,24 +13,7 @@ This directory contains deployment scripts for Netania De Laiya infrastructure.
   - Branding verification
   - Docker container status
 
-### `quick-deploy-prod.sh`
-- **Purpose**: Quick production deployment with zero-downtime (Digital Ocean)
-- **Usage**: `./scripts/quick-deploy-prod.sh`
-- **What it does**:
-  - Rebuilds production Docker containers with zero downtime
-  - Uses `--force-recreate` for seamless updates
-  - Tests endpoints
-  - Verifies deployment
 
-### `zero-downtime-deploy.sh`
-- **Purpose**: Advanced zero-downtime deployment with health checks
-- **Usage**: `./scripts/zero-downtime-deploy.sh [environment]`
-- **Environments**: `production`, `uat`, `rollback-prod`, `rollback-uat`
-- **What it does**:
-  - Implements proper zero-downtime deployment
-  - Health checks for each container
-  - Automatic rollback on failure
-  - Nginx proxy restart
 
 ### `deploy-uat.sh`
 - **Purpose**: Deploy UAT with crawling prevention
@@ -70,18 +53,10 @@ This directory contains deployment scripts for Netania De Laiya infrastructure.
    # Verify current status
    ./scripts/verify-deployment.sh
    
-   # Quick production deployment (zero-downtime)
-   ./scripts/quick-deploy-prod.sh
+   # Deploy production (zero-downtime)
+   ./scripts/deploy-production.sh
    
-   # Advanced zero-downtime deployment with health checks
-   ./scripts/zero-downtime-deploy.sh production
-   ./scripts/zero-downtime-deploy.sh uat
-   
-   # Rollback if needed
-   ./scripts/zero-downtime-deploy.sh rollback-prod
-   ./scripts/zero-downtime-deploy.sh rollback-uat
-   
-   # Deploy UAT
+   # Deploy UAT (zero-downtime)
    ./scripts/deploy-uat.sh
    ```
 
@@ -89,7 +64,8 @@ This directory contains deployment scripts for Netania De Laiya infrastructure.
 
 - **Production**: `prod/docker-compose.yml`
 - **UAT**: `uat/docker-compose.uat.yml`
-- **Nginx**: `proxy/nginx/reverseproxy.dynamic.conf`
+- **Nginx Proxy**: `proxy/docker-compose.proxy.yml`
+- **Nginx Config**: `proxy/nginx/reverseproxy.dynamic.conf`
 
 ## Expected Behavior
 
