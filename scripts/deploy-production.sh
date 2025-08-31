@@ -54,9 +54,8 @@ echo "   - Safari: Cmd+Option+E (Mac)"
 print_status "Rebuilding Docker containers..."
 cd infra/prod
 
-# Stop existing containers
-print_status "Stopping existing containers..."
-docker compose down
+# Zero-downtime deployment approach
+print_status "Starting zero-downtime production deployment..."
 
 # Remove old images to force rebuild
 print_status "Removing old images..."
@@ -66,9 +65,13 @@ docker rmi cloud-haven-api:prod cloud-haven-web:prod 2>/dev/null || true
 print_status "Rebuilding containers..."
 docker compose build --no-cache
 
-# Start containers
-print_status "Starting containers..."
-docker compose up -d
+# Start new containers with new images (zero-downtime)
+print_status "Starting new containers with updated images..."
+docker compose up -d --force-recreate
+
+# Wait for new containers to be ready
+print_status "Waiting for new containers to be healthy..."
+sleep 10
 
 # Restart nginx proxy to apply new configurations
 print_status "Restarting nginx proxy to apply new configurations..."

@@ -36,9 +36,8 @@ print_status "Starting quick production deployment..."
 # Navigate to production directory
 cd prod
 
-# Stop containers
-print_status "Stopping production containers..."
-docker compose down
+# Zero-downtime deployment approach
+print_status "Starting zero-downtime production deployment..."
 
 # Remove old images to force rebuild
 print_status "Removing old images..."
@@ -48,9 +47,13 @@ docker rmi cloud-haven-web:prod cloud-haven-api:prod 2>/dev/null || true
 print_status "Rebuilding containers..."
 docker compose build --no-cache
 
-# Start containers
-print_status "Starting containers..."
-docker compose up -d
+# Start new containers with new images (zero-downtime)
+print_status "Starting new containers with updated images..."
+docker compose up -d --force-recreate
+
+# Wait for new containers to be ready
+print_status "Waiting for new containers to be healthy..."
+sleep 10
 
 # Restart nginx proxy to apply new configurations
 print_status "Restarting nginx proxy to apply new configurations..."

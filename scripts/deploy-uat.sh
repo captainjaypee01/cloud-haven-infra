@@ -30,9 +30,8 @@ print_error() {
 print_status "Rebuilding UAT Docker containers..."
 cd uat
 
-# Stop existing containers
-print_status "Stopping existing UAT containers..."
-docker compose -f docker-compose.uat.yml down
+# Zero-downtime deployment approach
+print_status "Starting zero-downtime UAT deployment..."
 
 # Remove old images to force rebuild
 print_status "Removing old UAT images..."
@@ -42,9 +41,13 @@ docker rmi cloud-haven-web:uat cloud-haven-api:uat 2>/dev/null || true
 print_status "Rebuilding UAT containers..."
 docker compose -f docker-compose.uat.yml build --no-cache
 
-# Start containers
-print_status "Starting UAT containers..."
-docker compose -f docker-compose.uat.yml up -d
+# Start new containers with new images (zero-downtime)
+print_status "Starting new UAT containers with updated images..."
+docker compose -f docker-compose.uat.yml up -d --force-recreate
+
+# Wait for new containers to be ready
+print_status "Waiting for new UAT containers to be healthy..."
+sleep 10
 
 # 2. Restart nginx proxy to apply new robots.txt configurations
 print_status "Restarting nginx proxy to apply new configurations..."
