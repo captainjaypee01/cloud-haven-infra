@@ -63,7 +63,7 @@ echo "   - Safari: Cmd+Option+E (Mac)"
 
 # 4. Rebuild and redeploy Docker containers
 print_status "Rebuilding Docker containers..."
-cd infra/prod
+cd prod
 
 # Zero-downtime deployment approach
 print_status "Starting zero-downtime production deployment..."
