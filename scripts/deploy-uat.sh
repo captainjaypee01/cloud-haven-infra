@@ -64,11 +64,11 @@ print_status "Verifying UAT deployment..."
 sleep 10
 
 # Check if containers are running
-if docker compose -f docker-compose.uat.yml ps | grep -q "Up"; then
+if docker compose -f uat/docker-compose.uat.yml ps | grep -q "Up"; then
     print_status "✅ UAT containers are running successfully"
 else
     print_error "❌ Some UAT containers failed to start"
-    docker compose -f docker-compose.uat.yml ps
+    docker compose -f uat/docker-compose.uat.yml ps
     exit 1
 fi
 
