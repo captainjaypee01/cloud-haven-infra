@@ -37,9 +37,20 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     sudo dscacheutil -flushcache
     sudo killall -HUP mDNSResponder
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux
-    sudo systemctl restart systemd-resolved
-    sudo systemctl restart NetworkManager
+    # Linux - Handle different distributions
+    if systemctl is-active --quiet systemd-resolved 2>/dev/null; then
+        sudo systemctl restart systemd-resolved
+        print_status "✅ systemd-resolved restarted"
+    else
+        print_warning "⚠️  systemd-resolved not found, skipping DNS cache clear"
+    fi
+    
+    if systemctl is-active --quiet NetworkManager 2>/dev/null; then
+        sudo systemctl restart NetworkManager
+        print_status "✅ NetworkManager restarted"
+    else
+        print_warning "⚠️  NetworkManager not found, skipping network cache clear"
+    fi
 else
     print_warning "Unknown OS type. Please clear DNS cache manually."
 fi
