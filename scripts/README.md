@@ -86,5 +86,5 @@ This directory contains deployment scripts for Netania De Laiya infrastructure.
 If scripts fail:
 1. Check if you're in the correct directory (`infra/`)
 2. Verify Docker is running: `docker ps`
-3. Check container logs: `docker-compose logs`
+3. Check container logs: `docker compose logs`
 4. Ensure scripts are executable: `chmod +x scripts/*.sh`

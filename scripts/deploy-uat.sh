@@ -32,7 +32,7 @@ cd uat
 
 # Stop existing containers
 print_status "Stopping existing UAT containers..."
-docker-compose -f docker-compose.uat.yml down
+docker compose -f docker-compose.uat.yml down
 
 # Remove old images to force rebuild
 print_status "Removing old UAT images..."
@@ -40,13 +40,23 @@ docker rmi cloud-haven-web:uat cloud-haven-api:uat 2>/dev/null || true
 
 # Rebuild containers
 print_status "Rebuilding UAT containers..."
-docker-compose -f docker-compose.uat.yml build --no-cache
+docker compose -f docker-compose.uat.yml build --no-cache
 
 # Start containers
 print_status "Starting UAT containers..."
-docker-compose -f docker-compose.uat.yml up -d
+docker compose -f docker-compose.uat.yml up -d
 
-# 2. Verify UAT deployment
+# 2. Restart nginx proxy to apply new robots.txt configurations
+print_status "Restarting nginx proxy to apply new configurations..."
+cd ../proxy
+if [ -f "docker-compose.yml" ]; then
+    docker compose restart nginx
+    print_status "✅ Nginx proxy restarted"
+else
+    print_warning "⚠️  Nginx proxy docker-compose.yml not found. Please restart nginx manually."
+fi
+
+# 3. Verify UAT deployment
 print_status "Verifying UAT deployment..."
 sleep 10
 
@@ -59,7 +69,7 @@ else
     exit 1
 fi
 
-# 3. Test UAT endpoints
+# 4. Test UAT endpoints
 print_status "Testing UAT endpoints..."
 UAT_URL="https://uat.netaniadelaiya.com"
 UAT_API_URL="https://uat-api.netaniadelaiya.com"
@@ -78,7 +88,7 @@ else
     print_error "❌ UAT API is not accessible"
 fi
 
-# 4. Verify robots.txt blocking
+# 5. Verify robots.txt blocking
 print_status "Verifying robots.txt blocking for UAT..."
 
 # Test UAT frontend robots.txt
@@ -101,7 +111,7 @@ else
     echo "$UAT_API_ROBOTS"
 fi
 
-# 5. Add noindex meta tags verification
+# 6. Add noindex meta tags verification
 print_status "Verifying noindex meta tags..."
 UAT_HTML=$(curl -s "$UAT_URL")
 if echo "$UAT_HTML" | grep -q "noindex"; then

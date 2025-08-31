@@ -141,11 +141,11 @@ print_status "Checking Docker container status..."
 if [ -f "prod/docker-compose.yml" ]; then
     cd prod
     print_status "Production containers:"
-    docker-compose ps
+    docker compose ps
     
     cd ../uat
     print_status "UAT containers:"
-    docker-compose -f docker-compose.uat.yml ps
+    docker compose -f docker-compose.uat.yml ps
 else
     print_warning "⚠️  Please run this script from the infra directory"
 fi

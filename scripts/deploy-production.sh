@@ -56,19 +56,29 @@ cd infra/prod
 
 # Stop existing containers
 print_status "Stopping existing containers..."
-docker-compose down
+docker compose down
 
 # Remove old images to force rebuild
 print_status "Removing old images..."
-docker rmi cloud-haven-web:prod cloud-haven-api:prod 2>/dev/null || true
+docker rmi cloud-haven-api:prod cloud-haven-web:prod 2>/dev/null || true
 
 # Rebuild containers
 print_status "Rebuilding containers..."
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # Start containers
 print_status "Starting containers..."
-docker-compose up -d
+docker compose up -d
+
+# Restart nginx proxy to apply new configurations
+print_status "Restarting nginx proxy to apply new configurations..."
+cd ../proxy
+if [ -f "docker-compose.yml" ]; then
+    docker compose restart nginx
+    print_status "✅ Nginx proxy restarted"
+else
+    print_warning "⚠️  Nginx proxy docker-compose.yml not found. Please restart nginx manually."
+fi
 
 # 5. Verify deployment
 print_status "Verifying deployment..."
