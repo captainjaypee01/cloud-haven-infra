@@ -101,19 +101,20 @@ if [ -n "$CURRENT_FRONTEND_ID" ]; then
     docker rm $CURRENT_FRONTEND_ID 2>/dev/null || true
 fi
 
-# 7. Start UAT frontend service with new image
-print_status "Starting UAT frontend service with new image..."
-# The new container is already running with the temporary name, so we just need to rename it
+# 7. Stop the temporary container and let Docker Compose manage the frontend
+print_status "Stopping temporary container to let Docker Compose take over..."
+docker stop $NEW_FRONTEND_NAME
+docker rm $NEW_FRONTEND_NAME
 
-# 8. Rename the new container to the proper name
-print_status "Renaming new container to frontend-uat..."
-docker rename $NEW_FRONTEND_NAME frontend-uat
+# 8. Start UAT frontend service with Docker Compose
+print_status "Starting UAT frontend service with Docker Compose..."
+docker compose -f docker-compose.uat.yml up -d frontend-uat
 
-# 6. Wait for service to be ready
+# 9. Wait for service to be ready
 print_status "Waiting for UAT frontend service to be healthy..."
 sleep 10
 
-# 7. Restart nginx proxy to apply new robots.txt configurations
+# 10. Restart nginx proxy to apply new robots.txt configurations
 print_status "Restarting nginx proxy to apply new configurations..."
 cd ../proxy
 if [ -f "docker-compose.proxy.yml" ]; then
@@ -123,7 +124,7 @@ else
     print_warning "⚠️  Nginx proxy docker-compose.proxy.yml not found. Please restart nginx manually."
 fi
 
-# 8. Verify UAT frontend deployment
+# 11. Verify UAT frontend deployment
 print_status "Verifying UAT frontend deployment..."
 
 cd ../uat
@@ -136,7 +137,7 @@ else
     exit 1
 fi
 
-# 9. Test UAT frontend endpoint
+# 12. Test UAT frontend endpoint
 print_status "Testing UAT frontend endpoint..."
 UAT_URL="https://uat.netaniadelaiya.com"
 
@@ -146,7 +147,7 @@ else
     print_error "❌ UAT frontend is not accessible"
 fi
 
-# 10. Test UAT frontend content
+# 13. Test UAT frontend content
 print_status "Testing UAT frontend content..."
 UAT_HTML=$(curl -s "$UAT_URL")
 if echo "$UAT_HTML" | grep -q "Netania De Laiya"; then
@@ -155,7 +156,7 @@ else
     print_warning "⚠️  UAT frontend might not show correct branding. Please verify manually."
 fi
 
-# 11. Verify noindex meta tags are present (should be present in UAT)
+# 14. Verify noindex meta tags are present (should be present in UAT)
 print_status "Verifying noindex meta tags are present in UAT..."
 if echo "$UAT_HTML" | grep -q "noindex"; then
     print_status "✅ UAT frontend has noindex meta tags (correct)"
@@ -163,7 +164,7 @@ else
     print_warning "⚠️  UAT frontend might not have noindex meta tags. Consider adding them."
 fi
 
-# 12. Verify robots.txt blocking for UAT frontend
+# 15. Verify robots.txt blocking for UAT frontend
 print_status "Verifying robots.txt blocking for UAT frontend..."
 UAT_ROBOTS=$(curl -s "$UAT_URL/robots.txt")
 if echo "$UAT_ROBOTS" | grep -q "Disallow: /"; then
@@ -174,14 +175,14 @@ else
     echo "$UAT_ROBOTS"
 fi
 
-# 13. Test search engine blocking
+# 16. Test search engine blocking
 print_status "Testing search engine blocking..."
 print_status "Please manually verify the following:"
 echo "   1. Visit https://uat.netaniadelaiya.com/robots.txt"
 echo "   2. Verify it shows 'Disallow: /' for all user agents"
 echo "   3. Check that noindex meta tags are present in the HTML source"
 
-# 14. Additional security measures
+# 17. Additional security measures
 print_status "Additional UAT security measures:"
 echo "   - UAT should not be indexed by search engines"
 echo "   - UAT should not appear in search results"
