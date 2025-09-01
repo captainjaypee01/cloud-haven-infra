@@ -37,9 +37,11 @@ Deploys only the backend services to production:
 2. Rebuilds the backend container
 3. Starts backend services
 4. Runs database migrations
-5. Clears Laravel caches
-6. Restarts queue and scheduler
-7. Verifies deployment and tests connections
+5. Creates storage link
+6. **Fixes storage permissions** (prevents logging issues)
+7. Clears Laravel caches
+8. Restarts queue and scheduler
+9. Verifies deployment and tests connections
 
 #### `deploy-backend-uat.sh`
 Deploys only the backend services to UAT:
@@ -63,10 +65,12 @@ Deploys only the backend services to UAT:
 2. Rebuilds the UAT backend container
 3. Starts UAT backend services
 4. Runs UAT database migrations
-5. Clears UAT Laravel caches
-6. Restarts UAT queue and scheduler
-7. Verifies UAT deployment and tests connections
-8. Verifies robots.txt blocking for UAT API
+5. Creates UAT storage link
+6. **Fixes UAT storage permissions** (prevents logging issues)
+7. Clears UAT Laravel caches
+8. Restarts UAT queue and scheduler
+9. Verifies UAT deployment and tests connections
+10. Verifies robots.txt blocking for UAT API
 
 ### Frontend-Only Deployment Scripts
 
@@ -203,6 +207,22 @@ All deployment scripts now implement **zero-downtime deployment** using the foll
 ### UAT
 - Frontend: https://uat.netaniadelaiya.com
 - API: https://uat-api.netaniadelaiya.com
+
+## 🔧 Automatic Permission Fixes
+
+All backend deployment scripts now automatically fix storage permissions to prevent common production logging issues:
+
+**What gets fixed:**
+- Creates necessary directories: `storage/logs`, `storage/framework/*`, `bootstrap/cache`
+- Sets proper ownership: `www-data:www-data`
+- Sets proper permissions: `775` for directories, `664` for files
+- Runs automatically after storage link creation, before cache clearing
+
+**Why this matters:**
+- Prevents "Permission denied" errors when writing to log files
+- Ensures Laravel can create cache files and sessions
+- Fixes issues that commonly occur in Docker production environments
+- Eliminates the need for manual permission fixes after deployment
 
 ## Troubleshooting
 

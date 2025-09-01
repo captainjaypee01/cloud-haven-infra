@@ -90,6 +90,14 @@ else
     print_warning "⚠️  UAT storage link already exists or failed (this is usually OK)"
 fi
 
+# 4.6. Fix storage permissions
+print_status "Fixing UAT storage permissions..."
+if docker exec backend-uat bash -c 'mkdir -p storage/logs storage/framework/{cache,data,sessions,testing,views} bootstrap/cache && chown -R www-data:www-data storage bootstrap/cache && chmod -R 775 storage bootstrap/cache'; then
+    print_status "✅ UAT storage permissions fixed successfully"
+else
+    print_warning "⚠️  UAT storage permissions fix failed (this might cause logging issues)"
+fi
+
 # 5. Test UAT endpoints
 print_status "Testing UAT endpoints..."
 UAT_URL="https://uat.netaniadelaiya.com"

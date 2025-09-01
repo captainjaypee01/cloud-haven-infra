@@ -125,6 +125,14 @@ else
     print_warning "⚠️  Production storage link already exists or failed (this is usually OK)"
 fi
 
+# 6.6. Fix storage permissions
+print_status "Fixing production storage permissions..."
+if docker exec backend-prod bash -c 'mkdir -p storage/logs storage/framework/{cache,data,sessions,testing,views} bootstrap/cache && chown -R www-data:www-data storage bootstrap/cache && chmod -R 775 storage bootstrap/cache'; then
+    print_status "✅ Production storage permissions fixed successfully"
+else
+    print_warning "⚠️  Production storage permissions fix failed (this might cause logging issues)"
+fi
+
 # 7. Test endpoints
 print_status "Testing endpoints..."
 PROD_URL="https://www.netaniadelaiya.com"
