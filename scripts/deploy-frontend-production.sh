@@ -30,19 +30,24 @@ print_error() {
 print_status "Navigating to production infrastructure directory..."
 cd prod
 
-# 2. Build new frontend image alongside running container (zero-downtime)
+# 2. Clean up any existing frontend-prod containers to avoid conflicts
+print_status "Cleaning up any existing frontend-prod containers..."
+docker stop frontend-prod 2>/dev/null || true
+docker rm frontend-prod 2>/dev/null || true
+
+# 3. Build new frontend image alongside running container (zero-downtime)
 print_status "Building new frontend image alongside running container..."
 docker compose build --no-cache frontend-prod
 
-# 3. Create new frontend container with temporary name
+# 4. Create new frontend container with temporary name
 print_status "Creating new frontend container for zero-downtime deployment..."
 NEW_FRONTEND_NAME="frontend-prod-new"
 
 # Get the current frontend-prod container ID before scaling down
-CURRENT_FRONTEND_ID=$(docker compose ps -q frontend-prod)
+CURRENT_FRONTEND_NAME=$(docker compose ps -q frontend-prod)
 
-if [ -n "$CURRENT_FRONTEND_ID" ]; then
-    print_status "Current frontend-prod container ID: $CURRENT_FRONTEND_ID"
+if [ -n "$CURRENT_FRONTEND_NAME" ]; then
+    print_status "Current frontend-prod container ID: $CURRENT_FRONTEND_NAME"
     # Scale down to 0
     docker compose up -d --scale frontend-prod=0
     
@@ -60,11 +65,11 @@ else
       cloud-haven-web:prod
 fi
 
-# 4. Wait for new container to be healthy
+# 5. Wait for new container to be healthy
 print_status "Waiting for new frontend container to be healthy..."
 sleep 10
 
-# 5. Health check for new frontend container
+# 6. Health check for new frontend container
 print_status "Performing health check on new frontend container..."
 if curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000" | grep -q "200\|404"; then
     print_status "✅ New frontend container is healthy"
@@ -77,18 +82,18 @@ else
     exit 1
 fi
 
-# 6. Stop old frontend container and rename new one
+# 7. Stop old frontend container and rename new one
 print_status "Switching traffic to new frontend container..."
-if [ -n "$CURRENT_FRONTEND_ID" ]; then
-    docker stop $CURRENT_FRONTEND_ID 2>/dev/null || true
-    docker rm $CURRENT_FRONTEND_ID 2>/dev/null || true
+if [ -n "$CURRENT_FRONTEND_NAME" ]; then
+    docker stop $CURRENT_FRONTEND_NAME 2>/dev/null || true
+    docker rm $CURRENT_FRONTEND_NAME 2>/dev/null || true
 fi
 
-# 7. Start frontend service with new image
+# 8. Start frontend service with new image
 print_status "Starting frontend service with new image..."
 # The new container is already running with the temporary name, so we just need to rename it
 
-# 8. Rename the new container to the proper name
+# 9. Rename the new container to the proper name
 print_status "Renaming new container to frontend-prod..."
 docker rename $NEW_FRONTEND_NAME frontend-prod
 

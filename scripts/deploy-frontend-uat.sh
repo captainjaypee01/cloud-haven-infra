@@ -30,7 +30,12 @@ print_error() {
 print_status "Navigating to UAT infrastructure directory..."
 cd uat
 
-# 2. Build new UAT frontend image alongside running container (zero-downtime)
+# 2. Clean up any existing frontend-uat containers to avoid conflicts
+print_status "Cleaning up any existing frontend-uat containers..."
+docker stop frontend-uat 2>/dev/null || true
+docker rm frontend-uat 2>/dev/null || true
+
+# 3. Build new UAT frontend image alongside running container (zero-downtime)
 print_status "Building new UAT frontend image alongside running container..."
 docker compose -f docker-compose.uat.yml build --no-cache frontend-uat
 

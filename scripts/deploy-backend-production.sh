@@ -30,11 +30,16 @@ print_error() {
 print_status "Navigating to production infrastructure directory..."
 cd prod
 
-# 2. Build new backend image alongside running containers (zero-downtime)
+# 2. Clean up any existing backend-prod containers to avoid conflicts
+print_status "Cleaning up any existing backend-prod containers..."
+docker stop backend-prod 2>/dev/null || true
+docker rm backend-prod 2>/dev/null || true
+
+# 3. Build new backend image alongside running containers (zero-downtime)
 print_status "Building new backend image alongside running containers..."
 docker compose build --no-cache backend-prod
 
-# 3. Create new backend container with temporary name
+# 4. Create new backend container with temporary name
 print_status "Creating new backend container for zero-downtime deployment..."
 NEW_BACKEND_NAME="backend-prod-new"
 
@@ -63,11 +68,11 @@ else
       cloud-haven-api:prod
 fi
 
-# 4. Wait for new container to be healthy
+# 5. Wait for new container to be healthy
 print_status "Waiting for new backend container to be healthy..."
 sleep 15
 
-# 5. Health check for new backend container
+# 6. Health check for new backend container
 print_status "Performing health check on new backend container..."
 if docker exec $NEW_BACKEND_NAME php artisan tinker --execute="echo 'Health check passed';"; then
     print_status "✅ New backend container is healthy"
@@ -80,19 +85,19 @@ else
     exit 1
 fi
 
-# 6. Stop old backend container and rename new one
+# 7. Stop old backend container and rename new one
 print_status "Switching traffic to new backend container..."
 if [ -n "$CURRENT_BACKEND_ID" ]; then
     docker stop $CURRENT_BACKEND_ID 2>/dev/null || true
     docker rm $CURRENT_BACKEND_ID 2>/dev/null || true
 fi
 
-# 7. Start backend services with new image
+# 8. Start backend services with new image
 print_status "Starting backend services with new image..."
 # The new container is already running with the temporary name, so we just need to start the other services
 docker compose up -d queue-prod scheduler-prod
 
-# 8. Rename the new container to the proper name
+# 9. Rename the new container to the proper name
 print_status "Renaming new container to backend-prod..."
 docker rename $NEW_BACKEND_NAME backend-prod
 

@@ -30,11 +30,16 @@ print_error() {
 print_status "Navigating to UAT infrastructure directory..."
 cd uat
 
-# 2. Build new UAT backend image alongside running containers (zero-downtime)
+# 2. Clean up any existing backend-uat containers to avoid conflicts
+print_status "Cleaning up any existing backend-uat containers..."
+docker stop backend-uat 2>/dev/null || true
+docker rm backend-uat 2>/dev/null || true
+
+# 3. Build new UAT backend image alongside running containers (zero-downtime)
 print_status "Building new UAT backend image alongside running containers..."
 docker compose -f docker-compose.uat.yml build --no-cache backend-uat
 
-# 3. Create new UAT backend container with temporary name
+# 4. Create new UAT backend container with temporary name
 print_status "Creating new UAT backend container for zero-downtime deployment..."
 NEW_BACKEND_NAME="backend-uat-new"
 
@@ -63,11 +68,11 @@ else
       cloud-haven-api:uat
 fi
 
-# 4. Wait for new container to be healthy
+# 5. Wait for new container to be healthy
 print_status "Waiting for new UAT backend container to be healthy..."
 sleep 15
 
-# 5. Health check for new UAT backend container
+# 6. Health check for new UAT backend container
 print_status "Performing health check on new UAT backend container..."
 if docker exec $NEW_BACKEND_NAME php artisan tinker --execute="echo 'Health check passed';"; then
     print_status "✅ New UAT backend container is healthy"
@@ -80,27 +85,27 @@ else
     exit 1
 fi
 
-# 6. Stop old UAT backend container and rename new one
+# 7. Stop old UAT backend container and rename new one
 print_status "Switching traffic to new UAT backend container..."
 if [ -n "$CURRENT_BACKEND_ID" ]; then
     docker stop $CURRENT_BACKEND_ID 2>/dev/null || true
     docker rm $CURRENT_BACKEND_ID 2>/dev/null || true
 fi
 
-# 7. Start UAT backend services with new image
+# 8. Start UAT backend services with new image
 print_status "Starting UAT backend services with new image..."
 # The new container is already running with the temporary name, so we just need to start the other services
 docker compose -f docker-compose.uat.yml up -d queue-uat scheduler-uat
 
-# 8. Rename the new container to the proper name
+# 9. Rename the new container to the proper name
 print_status "Renaming new container to backend-uat..."
 docker rename $NEW_BACKEND_NAME backend-uat
 
-# 6. Wait for services to be ready
+# 10. Wait for services to be ready
 print_status "Waiting for UAT backend services to be healthy..."
 sleep 15
 
-# 7. Run database migrations
+# 11. Run database migrations
 print_status "Running UAT database migrations..."
 if docker exec backend-uat php artisan migrate --force; then
     print_status "✅ UAT database migrations completed successfully"
@@ -109,14 +114,14 @@ else
     exit 1
 fi
 
-# 8. Clear Laravel caches
+# 12. Clear Laravel caches
 print_status "Clearing UAT Laravel caches..."
 docker exec backend-uat php artisan cache:clear
 docker exec backend-uat php artisan config:clear
 docker exec backend-uat php artisan route:clear
 docker exec backend-uat php artisan view:clear
 
-# 9. Restart queue and scheduler
+# 13. Restart queue and scheduler
 print_status "Restarting UAT queue and scheduler services..."
 docker compose -f docker-compose.uat.yml restart queue-uat scheduler-uat
 
