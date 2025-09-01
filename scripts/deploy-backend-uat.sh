@@ -30,21 +30,47 @@ print_error() {
 print_status "Navigating to UAT infrastructure directory..."
 cd uat
 
-# 2. Stop only backend-related containers
-print_status "Stopping backend-related UAT containers..."
-docker compose -f docker-compose.uat.yml stop backend-uat queue-uat scheduler-uat mysql-uat redis-uat 2>/dev/null || true
-
-# 3. Remove old backend images to force rebuild
-print_status "Removing old UAT backend images..."
-docker rmi cloud-haven-api:uat 2>/dev/null || true
-
-# 4. Rebuild only backend container
-print_status "Rebuilding UAT backend container..."
+# 2. Build new UAT backend image alongside running containers (zero-downtime)
+print_status "Building new UAT backend image alongside running containers..."
 docker compose -f docker-compose.uat.yml build --no-cache backend-uat
 
-# 5. Start backend services
-print_status "Starting UAT backend services..."
-docker compose -f docker-compose.uat.yml up -d backend-uat queue-uat scheduler-uat mysql-uat redis-uat
+# 3. Create new UAT backend container with temporary name
+print_status "Creating new UAT backend container for zero-downtime deployment..."
+NEW_BACKEND_NAME="backend-uat-new"
+docker compose -f docker-compose.uat.yml up -d --scale backend-uat=0
+docker run -d \
+  --name $NEW_BACKEND_NAME \
+  --network global-web-network \
+  --env-file ./env/uat.backend.env \
+  --volumes-from backend-uat \
+  cloud-haven-api:uat
+
+# 4. Wait for new container to be healthy
+print_status "Waiting for new UAT backend container to be healthy..."
+sleep 15
+
+# 5. Health check for new UAT backend container
+print_status "Performing health check on new UAT backend container..."
+if docker exec $NEW_BACKEND_NAME php artisan tinker --execute="echo 'Health check passed';"; then
+    print_status "✅ New UAT backend container is healthy"
+else
+    print_error "❌ New UAT backend container health check failed"
+    print_status "Rolling back - removing failed container..."
+    docker stop $NEW_BACKEND_NAME
+    docker rm $NEW_BACKEND_NAME
+    docker compose -f docker-compose.uat.yml up -d backend-uat
+    exit 1
+fi
+
+# 6. Stop old UAT backend container and rename new one
+print_status "Switching traffic to new UAT backend container..."
+docker stop backend-uat
+docker rm backend-uat
+docker rename $NEW_BACKEND_NAME backend-uat
+
+# 7. Start UAT backend services with new image
+print_status "Starting UAT backend services with new image..."
+docker compose -f docker-compose.uat.yml up -d backend-uat queue-uat scheduler-uat
 
 # 6. Wait for services to be ready
 print_status "Waiting for UAT backend services to be healthy..."

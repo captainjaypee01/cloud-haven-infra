@@ -117,7 +117,7 @@ Deploys only the frontend service to UAT:
 
 ### Efficiency
 - **Faster deployments**: Only rebuild and restart the services you need
-- **Reduced downtime**: Other services continue running during deployment
+- **Zero-downtime deployments**: Services remain available during updates
 - **Resource optimization**: Don't waste time building unnecessary containers
 
 ### Flexibility
@@ -127,7 +127,9 @@ Deploys only the frontend service to UAT:
 
 ### Safety
 - **Isolated deployments**: Changes to one component don't affect others
-- **Reduced risk**: Smaller blast radius for deployment issues
+- **Zero-downtime**: Services remain available during deployment
+- **Automatic rollback**: Failed deployments automatically revert to previous version
+- **Health checks**: New containers are verified before traffic switching
 - **Better testing**: Test individual components in isolation
 
 ## When to Use Each Script
@@ -156,6 +158,33 @@ Deploys only the frontend service to UAT:
 - Validating new features
 - Testing deployment processes
 - Development and staging work
+
+## Zero-Downtime Deployment Strategy
+
+All deployment scripts now implement **zero-downtime deployment** using the following approach:
+
+### Backend Deployment Process
+1. **Build new image** alongside running containers
+2. **Create new container** with temporary name (e.g., `backend-prod-new`)
+3. **Health check** new container to ensure it's working
+4. **Switch traffic** from old to new container
+5. **Clean up** old container and rename new one
+6. **Automatic rollback** if health check fails
+
+### Frontend Deployment Process
+1. **Build new image** alongside running containers
+2. **Create new container** with temporary name (e.g., `frontend-prod-new`)
+3. **Health check** new container to ensure it's working
+4. **Switch traffic** from old to new container
+5. **Clean up** old container and rename new one
+6. **Automatic rollback** if health check fails
+
+### Benefits of Zero-Downtime
+- ✅ **No service interruption** during deployments
+- ✅ **Automatic rollback** if new containers fail
+- ✅ **Health verification** before traffic switching
+- ✅ **Seamless updates** for end users
+- ✅ **Reduced deployment risk**
 
 ## Prerequisites
 

@@ -30,21 +30,47 @@ print_error() {
 print_status "Navigating to production infrastructure directory..."
 cd prod
 
-# 2. Stop only backend-related containers
-print_status "Stopping backend-related containers..."
-docker compose stop backend-prod queue-prod scheduler-prod mysql-prod redis-prod 2>/dev/null || true
-
-# 3. Remove old backend images to force rebuild
-print_status "Removing old backend images..."
-docker rmi cloud-haven-api:prod 2>/dev/null || true
-
-# 4. Rebuild only backend container
-print_status "Rebuilding backend container..."
+# 2. Build new backend image alongside running containers (zero-downtime)
+print_status "Building new backend image alongside running containers..."
 docker compose build --no-cache backend-prod
 
-# 5. Start backend services
-print_status "Starting backend services..."
-docker compose up -d backend-prod queue-prod scheduler-prod mysql-prod redis-prod
+# 3. Create new backend container with temporary name
+print_status "Creating new backend container for zero-downtime deployment..."
+NEW_BACKEND_NAME="backend-prod-new"
+docker compose up -d --scale backend-prod=0
+docker run -d \
+  --name $NEW_BACKEND_NAME \
+  --network global-web-network \
+  --env-file ./env/prod.backend.env \
+  --volumes-from backend-prod \
+  cloud-haven-api:prod
+
+# 4. Wait for new container to be healthy
+print_status "Waiting for new backend container to be healthy..."
+sleep 15
+
+# 5. Health check for new backend container
+print_status "Performing health check on new backend container..."
+if docker exec $NEW_BACKEND_NAME php artisan tinker --execute="echo 'Health check passed';"; then
+    print_status "✅ New backend container is healthy"
+else
+    print_error "❌ New backend container health check failed"
+    print_status "Rolling back - removing failed container..."
+    docker stop $NEW_BACKEND_NAME
+    docker rm $NEW_BACKEND_NAME
+    docker compose up -d backend-prod
+    exit 1
+fi
+
+# 6. Stop old backend container and rename new one
+print_status "Switching traffic to new backend container..."
+docker stop backend-prod
+docker rm backend-prod
+docker rename $NEW_BACKEND_NAME backend-prod
+
+# 7. Start backend services with new image
+print_status "Starting backend services with new image..."
+docker compose up -d backend-prod queue-prod scheduler-prod
 
 # 6. Wait for services to be ready
 print_status "Waiting for backend services to be healthy..."

@@ -30,20 +30,44 @@ print_error() {
 print_status "Navigating to UAT infrastructure directory..."
 cd uat
 
-# 2. Stop only frontend container
-print_status "Stopping UAT frontend container..."
-docker compose -f docker-compose.uat.yml stop frontend-uat 2>/dev/null || true
-
-# 3. Remove old frontend images to force rebuild
-print_status "Removing old UAT frontend images..."
-docker rmi cloud-haven-web:uat 2>/dev/null || true
-
-# 4. Rebuild only frontend container
-print_status "Rebuilding UAT frontend container..."
+# 2. Build new UAT frontend image alongside running container (zero-downtime)
+print_status "Building new UAT frontend image alongside running container..."
 docker compose -f docker-compose.uat.yml build --no-cache frontend-uat
 
-# 5. Start frontend service
-print_status "Starting UAT frontend service..."
+# 3. Create new UAT frontend container with temporary name
+print_status "Creating new UAT frontend container for zero-downtime deployment..."
+NEW_FRONTEND_NAME="frontend-uat-new"
+docker compose -f docker-compose.uat.yml up -d --scale frontend-uat=0
+docker run -d \
+  --name $NEW_FRONTEND_NAME \
+  --network global-web-network \
+  cloud-haven-web:uat
+
+# 4. Wait for new container to be healthy
+print_status "Waiting for new UAT frontend container to be healthy..."
+sleep 10
+
+# 5. Health check for new UAT frontend container
+print_status "Performing health check on new UAT frontend container..."
+if curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000" | grep -q "200\|404"; then
+    print_status "✅ New UAT frontend container is healthy"
+else
+    print_error "❌ New UAT frontend container health check failed"
+    print_status "Rolling back - removing failed container..."
+    docker stop $NEW_FRONTEND_NAME
+    docker rm $NEW_FRONTEND_NAME
+    docker compose -f docker-compose.uat.yml up -d frontend-uat
+    exit 1
+fi
+
+# 6. Stop old UAT frontend container and rename new one
+print_status "Switching traffic to new UAT frontend container..."
+docker stop frontend-uat
+docker rm frontend-uat
+docker rename $NEW_FRONTEND_NAME frontend-uat
+
+# 7. Start UAT frontend service with new image
+print_status "Starting UAT frontend service with new image..."
 docker compose -f docker-compose.uat.yml up -d frontend-uat
 
 # 6. Wait for service to be ready

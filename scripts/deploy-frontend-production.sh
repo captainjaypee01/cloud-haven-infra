@@ -30,20 +30,44 @@ print_error() {
 print_status "Navigating to production infrastructure directory..."
 cd prod
 
-# 2. Stop only frontend container
-print_status "Stopping frontend container..."
-docker compose stop frontend-prod 2>/dev/null || true
-
-# 3. Remove old frontend images to force rebuild
-print_status "Removing old frontend images..."
-docker rmi cloud-haven-web:prod 2>/dev/null || true
-
-# 4. Rebuild only frontend container
-print_status "Rebuilding frontend container..."
+# 2. Build new frontend image alongside running container (zero-downtime)
+print_status "Building new frontend image alongside running container..."
 docker compose build --no-cache frontend-prod
 
-# 5. Start frontend service
-print_status "Starting frontend service..."
+# 3. Create new frontend container with temporary name
+print_status "Creating new frontend container for zero-downtime deployment..."
+NEW_FRONTEND_NAME="frontend-prod-new"
+docker compose up -d --scale frontend-prod=0
+docker run -d \
+  --name $NEW_FRONTEND_NAME \
+  --network global-web-network \
+  cloud-haven-web:prod
+
+# 4. Wait for new container to be healthy
+print_status "Waiting for new frontend container to be healthy..."
+sleep 10
+
+# 5. Health check for new frontend container
+print_status "Performing health check on new frontend container..."
+if curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000" | grep -q "200\|404"; then
+    print_status "✅ New frontend container is healthy"
+else
+    print_error "❌ New frontend container health check failed"
+    print_status "Rolling back - removing failed container..."
+    docker stop $NEW_FRONTEND_NAME
+    docker rm $NEW_FRONTEND_NAME
+    docker compose up -d frontend-prod
+    exit 1
+fi
+
+# 6. Stop old frontend container and rename new one
+print_status "Switching traffic to new frontend container..."
+docker stop frontend-prod
+docker rm frontend-prod
+docker rename $NEW_FRONTEND_NAME frontend-prod
+
+# 7. Start frontend service with new image
+print_status "Starting frontend service with new image..."
 docker compose up -d frontend-prod
 
 # 6. Wait for service to be ready
