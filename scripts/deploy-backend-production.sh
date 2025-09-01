@@ -37,13 +37,31 @@ docker compose build --no-cache backend-prod
 # 3. Create new backend container with temporary name
 print_status "Creating new backend container for zero-downtime deployment..."
 NEW_BACKEND_NAME="backend-prod-new"
-docker compose up -d --scale backend-prod=0
-docker run -d \
-  --name $NEW_BACKEND_NAME \
-  --network global-web-network \
-  --env-file ./env/prod.backend.env \
-  --volumes-from backend-prod \
-  cloud-haven-api:prod
+
+# Get the current backend-prod container ID before scaling down
+CURRENT_BACKEND_ID=$(docker compose ps -q backend-prod)
+
+if [ -n "$CURRENT_BACKEND_ID" ]; then
+    print_status "Current backend-prod container ID: $CURRENT_BACKEND_ID"
+    # Scale down to 0
+    docker compose up -d --scale backend-prod=0
+    
+    # Create new container with volumes from the old one
+    docker run -d \
+      --name $NEW_BACKEND_NAME \
+      --network global-web-network \
+      --env-file ./env/prod.backend.env \
+      --volumes-from $CURRENT_BACKEND_ID \
+      cloud-haven-api:prod
+else
+    print_status "No existing backend-prod container found, creating new one..."
+    # Create new container without volumes-from
+    docker run -d \
+      --name $NEW_BACKEND_NAME \
+      --network global-web-network \
+      --env-file ./env/prod.backend.env \
+      cloud-haven-api:prod
+fi
 
 # 4. Wait for new container to be healthy
 print_status "Waiting for new backend container to be healthy..."
@@ -64,8 +82,10 @@ fi
 
 # 6. Stop old backend container and rename new one
 print_status "Switching traffic to new backend container..."
-docker stop backend-prod
-docker rm backend-prod
+if [ -n "$CURRENT_BACKEND_ID" ]; then
+    docker stop $CURRENT_BACKEND_ID 2>/dev/null || true
+    docker rm $CURRENT_BACKEND_ID 2>/dev/null || true
+fi
 docker rename $NEW_BACKEND_NAME backend-prod
 
 # 7. Start backend services with new image

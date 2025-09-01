@@ -37,13 +37,31 @@ docker compose -f docker-compose.uat.yml build --no-cache backend-uat
 # 3. Create new UAT backend container with temporary name
 print_status "Creating new UAT backend container for zero-downtime deployment..."
 NEW_BACKEND_NAME="backend-uat-new"
-docker compose -f docker-compose.uat.yml up -d --scale backend-uat=0
-docker run -d \
-  --name $NEW_BACKEND_NAME \
-  --network global-web-network \
-  --env-file ./env/uat.backend.env \
-  --volumes-from backend-uat \
-  cloud-haven-api:uat
+
+# Get the current backend-uat container ID before scaling down
+CURRENT_BACKEND_ID=$(docker compose -f docker-compose.uat.yml ps -q backend-uat)
+
+if [ -n "$CURRENT_BACKEND_ID" ]; then
+    print_status "Current backend-uat container ID: $CURRENT_BACKEND_ID"
+    # Scale down to 0
+    docker compose -f docker-compose.uat.yml up -d --scale backend-uat=0
+    
+    # Create new container with volumes from the old one
+    docker run -d \
+      --name $NEW_BACKEND_NAME \
+      --network global-web-network \
+      --env-file ./env/uat.backend.env \
+      --volumes-from $CURRENT_BACKEND_ID \
+      cloud-haven-api:uat
+else
+    print_status "No existing backend-uat container found, creating new one..."
+    # Create new container without volumes-from
+    docker run -d \
+      --name $NEW_BACKEND_NAME \
+      --network global-web-network \
+      --env-file ./env/uat.backend.env \
+      cloud-haven-api:uat
+fi
 
 # 4. Wait for new container to be healthy
 print_status "Waiting for new UAT backend container to be healthy..."
@@ -64,8 +82,10 @@ fi
 
 # 6. Stop old UAT backend container and rename new one
 print_status "Switching traffic to new UAT backend container..."
-docker stop backend-uat
-docker rm backend-uat
+if [ -n "$CURRENT_BACKEND_ID" ]; then
+    docker stop $CURRENT_BACKEND_ID 2>/dev/null || true
+    docker rm $CURRENT_BACKEND_ID 2>/dev/null || true
+fi
 docker rename $NEW_BACKEND_NAME backend-uat
 
 # 7. Start UAT backend services with new image

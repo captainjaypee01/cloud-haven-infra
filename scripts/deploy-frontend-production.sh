@@ -37,11 +37,28 @@ docker compose build --no-cache frontend-prod
 # 3. Create new frontend container with temporary name
 print_status "Creating new frontend container for zero-downtime deployment..."
 NEW_FRONTEND_NAME="frontend-prod-new"
-docker compose up -d --scale frontend-prod=0
-docker run -d \
-  --name $NEW_FRONTEND_NAME \
-  --network global-web-network \
-  cloud-haven-web:prod
+
+# Get the current frontend-prod container ID before scaling down
+CURRENT_FRONTEND_ID=$(docker compose ps -q frontend-prod)
+
+if [ -n "$CURRENT_FRONTEND_ID" ]; then
+    print_status "Current frontend-prod container ID: $CURRENT_FRONTEND_ID"
+    # Scale down to 0
+    docker compose up -d --scale frontend-prod=0
+    
+    # Create new container
+    docker run -d \
+      --name $NEW_FRONTEND_NAME \
+      --network global-web-network \
+      cloud-haven-web:prod
+else
+    print_status "No existing frontend-prod container found, creating new one..."
+    # Create new container
+    docker run -d \
+      --name $NEW_FRONTEND_NAME \
+      --network global-web-network \
+      cloud-haven-web:prod
+fi
 
 # 4. Wait for new container to be healthy
 print_status "Waiting for new frontend container to be healthy..."
@@ -62,8 +79,10 @@ fi
 
 # 6. Stop old frontend container and rename new one
 print_status "Switching traffic to new frontend container..."
-docker stop frontend-prod
-docker rm frontend-prod
+if [ -n "$CURRENT_FRONTEND_ID" ]; then
+    docker stop $CURRENT_FRONTEND_ID 2>/dev/null || true
+    docker rm $CURRENT_FRONTEND_ID 2>/dev/null || true
+fi
 docker rename $NEW_FRONTEND_NAME frontend-prod
 
 # 7. Start frontend service with new image

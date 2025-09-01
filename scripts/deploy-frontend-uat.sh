@@ -37,11 +37,28 @@ docker compose -f docker-compose.uat.yml build --no-cache frontend-uat
 # 3. Create new UAT frontend container with temporary name
 print_status "Creating new UAT frontend container for zero-downtime deployment..."
 NEW_FRONTEND_NAME="frontend-uat-new"
-docker compose -f docker-compose.uat.yml up -d --scale frontend-uat=0
-docker run -d \
-  --name $NEW_FRONTEND_NAME \
-  --network global-web-network \
-  cloud-haven-web:uat
+
+# Get the current frontend-uat container ID before scaling down
+CURRENT_FRONTEND_ID=$(docker compose -f docker-compose.uat.yml ps -q frontend-uat)
+
+if [ -n "$CURRENT_FRONTEND_ID" ]; then
+    print_status "Current frontend-uat container ID: $CURRENT_FRONTEND_ID"
+    # Scale down to 0
+    docker compose -f docker-compose.uat.yml up -d --scale frontend-uat=0
+    
+    # Create new container
+    docker run -d \
+      --name $NEW_FRONTEND_NAME \
+      --network global-web-network \
+      cloud-haven-web:uat
+else
+    print_status "No existing frontend-uat container found, creating new one..."
+    # Create new container
+    docker run -d \
+      --name $NEW_FRONTEND_NAME \
+      --network global-web-network \
+      cloud-haven-web:uat
+fi
 
 # 4. Wait for new container to be healthy
 print_status "Waiting for new UAT frontend container to be healthy..."
@@ -62,8 +79,10 @@ fi
 
 # 6. Stop old UAT frontend container and rename new one
 print_status "Switching traffic to new UAT frontend container..."
-docker stop frontend-uat
-docker rm frontend-uat
+if [ -n "$CURRENT_FRONTEND_ID" ]; then
+    docker stop $CURRENT_FRONTEND_ID 2>/dev/null || true
+    docker rm $CURRENT_FRONTEND_ID 2>/dev/null || true
+fi
 docker rename $NEW_FRONTEND_NAME frontend-uat
 
 # 7. Start UAT frontend service with new image
