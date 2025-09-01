@@ -117,6 +117,14 @@ else
     exit 1
 fi
 
+# 6.5. Create storage link
+print_status "Creating production storage link..."
+if docker exec backend-prod php artisan storage:link; then
+    print_status "✅ Production storage link created successfully"
+else
+    print_warning "⚠️  Production storage link already exists or failed (this is usually OK)"
+fi
+
 # 7. Test endpoints
 print_status "Testing endpoints..."
 PROD_URL="https://www.netaniadelaiya.com"

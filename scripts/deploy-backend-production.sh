@@ -145,6 +145,14 @@ else
     exit 1
 fi
 
+# 13.5. Create storage link
+print_status "Creating production storage link..."
+if docker exec backend-prod php artisan storage:link; then
+    print_status "✅ Production storage link created successfully"
+else
+    print_warning "⚠️  Production storage link already exists or failed (this is usually OK)"
+fi
+
 # 14. Clear Laravel caches
 print_status "Clearing Laravel caches..."
 docker exec backend-prod php artisan cache:clear

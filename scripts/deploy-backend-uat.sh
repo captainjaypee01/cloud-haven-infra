@@ -145,6 +145,14 @@ else
     exit 1
 fi
 
+# 13.5. Create storage link
+print_status "Creating UAT storage link..."
+if docker exec backend-uat php artisan storage:link; then
+    print_status "✅ UAT storage link created successfully"
+else
+    print_warning "⚠️  UAT storage link already exists or failed (this is usually OK)"
+fi
+
 # 14. Clear Laravel caches
 print_status "Clearing UAT Laravel caches..."
 docker exec backend-uat php artisan cache:clear

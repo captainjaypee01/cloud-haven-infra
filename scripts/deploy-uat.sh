@@ -82,6 +82,14 @@ else
     exit 1
 fi
 
+# 4.5. Create storage link
+print_status "Creating UAT storage link..."
+if docker exec backend-uat php artisan storage:link; then
+    print_status "✅ UAT storage link created successfully"
+else
+    print_warning "⚠️  UAT storage link already exists or failed (this is usually OK)"
+fi
+
 # 5. Test UAT endpoints
 print_status "Testing UAT endpoints..."
 UAT_URL="https://uat.netaniadelaiya.com"
