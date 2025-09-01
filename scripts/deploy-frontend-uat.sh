@@ -83,11 +83,14 @@ if [ -n "$CURRENT_FRONTEND_ID" ]; then
     docker stop $CURRENT_FRONTEND_ID 2>/dev/null || true
     docker rm $CURRENT_FRONTEND_ID 2>/dev/null || true
 fi
-docker rename $NEW_FRONTEND_NAME frontend-uat
 
 # 7. Start UAT frontend service with new image
 print_status "Starting UAT frontend service with new image..."
-docker compose -f docker-compose.uat.yml up -d frontend-uat
+# The new container is already running with the temporary name, so we just need to rename it
+
+# 8. Rename the new container to the proper name
+print_status "Renaming new container to frontend-uat..."
+docker rename $NEW_FRONTEND_NAME frontend-uat
 
 # 6. Wait for service to be ready
 print_status "Waiting for UAT frontend service to be healthy..."

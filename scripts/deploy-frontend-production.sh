@@ -83,11 +83,14 @@ if [ -n "$CURRENT_FRONTEND_ID" ]; then
     docker stop $CURRENT_FRONTEND_ID 2>/dev/null || true
     docker rm $CURRENT_FRONTEND_ID 2>/dev/null || true
 fi
-docker rename $NEW_FRONTEND_NAME frontend-prod
 
 # 7. Start frontend service with new image
 print_status "Starting frontend service with new image..."
-docker compose up -d frontend-prod
+# The new container is already running with the temporary name, so we just need to rename it
+
+# 8. Rename the new container to the proper name
+print_status "Renaming new container to frontend-prod..."
+docker rename $NEW_FRONTEND_NAME frontend-prod
 
 # 6. Wait for service to be ready
 print_status "Waiting for frontend service to be healthy..."

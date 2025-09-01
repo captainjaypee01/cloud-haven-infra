@@ -86,11 +86,15 @@ if [ -n "$CURRENT_BACKEND_ID" ]; then
     docker stop $CURRENT_BACKEND_ID 2>/dev/null || true
     docker rm $CURRENT_BACKEND_ID 2>/dev/null || true
 fi
-docker rename $NEW_BACKEND_NAME backend-uat
 
 # 7. Start UAT backend services with new image
 print_status "Starting UAT backend services with new image..."
-docker compose -f docker-compose.uat.yml up -d backend-uat queue-uat scheduler-uat
+# The new container is already running with the temporary name, so we just need to start the other services
+docker compose -f docker-compose.uat.yml up -d queue-uat scheduler-uat
+
+# 8. Rename the new container to the proper name
+print_status "Renaming new container to backend-uat..."
+docker rename $NEW_BACKEND_NAME backend-uat
 
 # 6. Wait for services to be ready
 print_status "Waiting for UAT backend services to be healthy..."

@@ -86,11 +86,15 @@ if [ -n "$CURRENT_BACKEND_ID" ]; then
     docker stop $CURRENT_BACKEND_ID 2>/dev/null || true
     docker rm $CURRENT_BACKEND_ID 2>/dev/null || true
 fi
-docker rename $NEW_BACKEND_NAME backend-prod
 
 # 7. Start backend services with new image
 print_status "Starting backend services with new image..."
-docker compose up -d backend-prod queue-prod scheduler-prod
+# The new container is already running with the temporary name, so we just need to start the other services
+docker compose up -d queue-prod scheduler-prod
+
+# 8. Rename the new container to the proper name
+print_status "Renaming new container to backend-prod..."
+docker rename $NEW_BACKEND_NAME backend-prod
 
 # 6. Wait for services to be ready
 print_status "Waiting for backend services to be healthy..."
