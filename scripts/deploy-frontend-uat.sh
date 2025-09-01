@@ -35,6 +35,18 @@ print_status "Cleaning up any existing frontend-uat containers..."
 docker stop frontend-uat 2>/dev/null || true
 docker rm frontend-uat 2>/dev/null || true
 
+# Also clean up any leftover temporary containers
+print_status "Cleaning up any leftover temporary containers..."
+docker stop frontend-uat-new 2>/dev/null || true
+docker rm frontend-uat-new 2>/dev/null || true
+docker stop frontend-uat-temp 2>/dev/null || true
+docker rm frontend-uat-temp 2>/dev/null || true
+
+# Clean up any containers with similar naming patterns
+print_status "Cleaning up any containers with similar naming patterns..."
+docker ps -a --filter "name=frontend-uat" --filter "name=frontend-uat-" --format "{{.Names}}" | xargs -r docker stop 2>/dev/null || true
+docker ps -a --filter "name=frontend-uat" --filter "name=frontend-uat-" --format "{{.Names}}" | xargs -r docker rm 2>/dev/null || true
+
 # 3. Build new UAT frontend image alongside running container (zero-downtime)
 print_status "Building new UAT frontend image alongside running container..."
 docker compose -f docker-compose.uat.yml build --no-cache frontend-uat

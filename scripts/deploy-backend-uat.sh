@@ -35,6 +35,18 @@ print_status "Cleaning up any existing backend-uat containers..."
 docker stop backend-uat 2>/dev/null || true
 docker rm backend-uat 2>/dev/null || true
 
+# Also clean up any leftover temporary containers
+print_status "Cleaning up any leftover temporary containers..."
+docker stop backend-uat-new 2>/dev/null || true
+docker rm backend-uat-new 2>/dev/null || true
+docker stop backend-uat-temp 2>/dev/null || true
+docker rm backend-uat-temp 2>/dev/null || true
+
+# Clean up any containers with similar naming patterns
+print_status "Cleaning up any containers with similar naming patterns..."
+docker ps -a --filter "name=backend-uat" --filter "name=backend-uat-" --format "{{.Names}}" | xargs -r docker stop 2>/dev/null || true
+docker ps -a --filter "name=backend-uat" --filter "name=backend-uat-" --format "{{.Names}}" | xargs -r docker rm 2>/dev/null || true
+
 # 3. Build new UAT backend image alongside running containers (zero-downtime)
 print_status "Building new UAT backend image alongside running containers..."
 docker compose -f docker-compose.uat.yml build --no-cache backend-uat
@@ -101,31 +113,50 @@ docker compose -f docker-compose.uat.yml up -d queue-uat scheduler-uat
 print_status "Renaming new container to backend-uat..."
 docker rename $NEW_BACKEND_NAME backend-uat
 
-# 10. Wait for services to be ready
+# 10. Restart nginx proxy to apply new UAT backend configurations
+print_status "Restarting nginx proxy to apply new UAT backend configurations..."
+cd ../proxy
+if [ -f "docker-compose.proxy.yml" ]; then
+    docker compose -f docker-compose.proxy.yml restart nginx-proxy
+    print_status "✅ Nginx proxy restarted"
+else
+    print_warning "⚠️  Nginx proxy docker-compose.proxy.yml not found. Please restart nginx manually."
+fi
+
+# 11. Wait for services to be ready
 print_status "Waiting for UAT backend services to be healthy..."
+cd ../uat
 sleep 15
 
-# 11. Run database migrations
+# 12. Test nginx proxy configuration
+print_status "Testing nginx proxy configuration..."
+if curl -s -o /dev/null -w "%{http_code}" "http://localhost:80" | grep -q "200\|404\|502"; then
+    print_status "✅ Nginx proxy is responding"
+else
+    print_warning "⚠️  Nginx proxy might not be responding properly"
+fi
+
+# 13. Run database migrations
 print_status "Running UAT database migrations..."
 if docker exec backend-uat php artisan migrate --force; then
     print_status "✅ UAT database migrations completed successfully"
 else
-    print_error "❌ UAT database migrations failed"
+    print_warning "⚠️  UAT database migrations failed"
     exit 1
 fi
 
-# 12. Clear Laravel caches
+# 14. Clear Laravel caches
 print_status "Clearing UAT Laravel caches..."
 docker exec backend-uat php artisan cache:clear
 docker exec backend-uat php artisan config:clear
 docker exec backend-uat php artisan route:clear
 docker exec backend-uat php artisan view:clear
 
-# 13. Restart queue and scheduler
+# 15. Restart queue and scheduler
 print_status "Restarting UAT queue and scheduler services..."
 docker compose -f docker-compose.uat.yml restart queue-uat scheduler-uat
 
-# 10. Verify UAT backend deployment
+# 16. Verify UAT backend deployment
 print_status "Verifying UAT backend deployment..."
 
 # Check if backend containers are running
@@ -137,7 +168,7 @@ else
     exit 1
 fi
 
-# 11. Test UAT backend API endpoint
+# 17. Test UAT backend API endpoint
 print_status "Testing UAT backend API endpoint..."
 UAT_API_URL="https://uat-api.netaniadelaiya.com"
 
@@ -147,7 +178,7 @@ else
     print_error "❌ UAT API is not accessible"
 fi
 
-# 12. Test database connection
+# 18. Test database connection
 print_status "Testing UAT database connection..."
 if docker exec backend-uat php artisan tinker --execute="DB::connection()->getPdo(); echo 'UAT Database connected successfully';"; then
     print_status "✅ UAT database connection is working"
@@ -155,7 +186,7 @@ else
     print_error "❌ UAT database connection failed"
 fi
 
-# 13. Test Redis connection
+# 19. Test Redis connection
 print_status "Testing UAT Redis connection..."
 if docker exec backend-uat php artisan tinker --execute="Redis::ping(); echo 'UAT Redis connected successfully';"; then
     print_status "✅ UAT Redis connection is working"
@@ -163,12 +194,12 @@ else
     print_error "❌ UAT Redis connection failed"
 fi
 
-# 14. Check queue status
+# 20. Check queue status
 print_status "Checking UAT queue status..."
 QUEUE_STATUS=$(docker exec queue-uat php artisan queue:monitor 2>/dev/null || echo "UAT Queue monitor not available")
 print_status "UAT Queue status: $QUEUE_STATUS"
 
-# 15. Verify robots.txt blocking for UAT API
+# 21. Verify robots.txt blocking for UAT API
 print_status "Verifying robots.txt blocking for UAT API..."
 UAT_API_ROBOTS=$(curl -s "$UAT_API_URL/robots.txt")
 if echo "$UAT_API_ROBOTS" | grep -q "Disallow: /"; then

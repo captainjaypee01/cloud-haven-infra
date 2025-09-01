@@ -35,6 +35,18 @@ print_status "Cleaning up any existing frontend-prod containers..."
 docker stop frontend-prod 2>/dev/null || true
 docker rm frontend-prod 2>/dev/null || true
 
+# Also clean up any leftover temporary containers
+print_status "Cleaning up any leftover temporary containers..."
+docker stop frontend-prod-new 2>/dev/null || true
+docker rm frontend-prod-new 2>/dev/null || true
+docker stop frontend-prod-temp 2>/dev/null || true
+docker rm frontend-prod-temp 2>/dev/null || true
+
+# Clean up any containers with similar naming patterns
+print_status "Cleaning up any containers with similar naming patterns..."
+docker ps -a --filter "name=frontend-prod" --filter "name=frontend-prod-" --format "{{.Names}}" | xargs -r docker stop 2>/dev/null || true
+docker ps -a --filter "name=frontend-prod" --filter "name=frontend-prod-" --format "{{.Names}}" | xargs -r docker rm 2>/dev/null || true
+
 # 3. Build new frontend image alongside running container (zero-downtime)
 print_status "Building new frontend image alongside running container..."
 docker compose build --no-cache frontend-prod

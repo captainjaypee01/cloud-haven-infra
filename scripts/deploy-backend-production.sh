@@ -35,6 +35,18 @@ print_status "Cleaning up any existing backend-prod containers..."
 docker stop backend-prod 2>/dev/null || true
 docker rm backend-prod 2>/dev/null || true
 
+# Also clean up any leftover temporary containers
+print_status "Cleaning up any leftover temporary containers..."
+docker stop backend-prod-new 2>/dev/null || true
+docker rm backend-prod-new 2>/dev/null || true
+docker stop backend-prod-temp 2>/dev/null || true
+docker rm backend-prod-temp 2>/dev/null || true
+
+# Clean up any containers with similar naming patterns
+print_status "Cleaning up any containers with similar naming patterns..."
+docker ps -a --filter "name=backend-prod" --filter "name=backend-prod-" --format "{{.Names}}" | xargs -r docker stop 2>/dev/null || true
+docker ps -a --filter "name=backend-prod" --filter "name=backend-prod-" --format "{{.Names}}" | xargs -r docker rm 2>/dev/null || true
+
 # 3. Build new backend image alongside running containers (zero-downtime)
 print_status "Building new backend image alongside running containers..."
 docker compose build --no-cache backend-prod
@@ -101,11 +113,30 @@ docker compose up -d queue-prod scheduler-prod
 print_status "Renaming new container to backend-prod..."
 docker rename $NEW_BACKEND_NAME backend-prod
 
-# 6. Wait for services to be ready
+# 10. Restart nginx proxy to apply new backend configurations
+print_status "Restarting nginx proxy to apply new backend configurations..."
+cd ../proxy
+if [ -f "docker-compose.proxy.yml" ]; then
+    docker compose -f docker-compose.proxy.yml restart nginx-proxy
+    print_status "✅ Nginx proxy restarted"
+else
+    print_warning "⚠️  Nginx proxy docker-compose.proxy.yml not found. Please restart nginx manually."
+fi
+
+# 11. Wait for services to be ready
 print_status "Waiting for backend services to be healthy..."
+cd ../prod
 sleep 15
 
-# 7. Run database migrations
+# 12. Test nginx proxy configuration
+print_status "Testing nginx proxy configuration..."
+if curl -s -o /dev/null -w "%{http_code}" "http://localhost:80" | grep -q "200\|404\|502"; then
+    print_status "✅ Nginx proxy is responding"
+else
+    print_warning "⚠️  Nginx proxy might not be responding properly"
+fi
+
+# 13. Run database migrations
 print_status "Running database migrations..."
 if docker exec backend-prod php artisan migrate --force; then
     print_status "✅ Database migrations completed successfully"
@@ -114,14 +145,14 @@ else
     exit 1
 fi
 
-# 8. Clear Laravel caches
+# 14. Clear Laravel caches
 print_status "Clearing Laravel caches..."
 docker exec backend-prod php artisan cache:clear
 docker exec backend-prod php artisan config:clear
 docker exec backend-prod php artisan route:clear
 docker exec backend-prod php artisan view:clear
 
-# 9. Restart queue and scheduler
+# 15. Restart queue and scheduler
 print_status "Restarting queue and scheduler services..."
 docker compose restart queue-prod scheduler-prod
 
