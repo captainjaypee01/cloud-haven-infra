@@ -109,6 +109,7 @@ docker compose up -d --force-recreate backend-prod queue-prod scheduler-prod
 
 docker exec backend-prod printenv APP_KEY
 docker exec backend-prod printenv DB_HOST
+docker exec -it backend-uat bash
 ```
 
 3) Run migrations (and storage link)
