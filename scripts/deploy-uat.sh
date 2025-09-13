@@ -33,30 +33,33 @@ cd uat
 # Zero-downtime deployment approach
 print_status "Starting zero-downtime UAT deployment..."
 
-# Remove old images to force rebuild
-print_status "Removing old UAT images..."
-docker rmi cloud-haven-web:uat cloud-haven-api:uat 2>/dev/null || true
+# Avoid removing images up-front; build will replace as needed (prevents gaps)
+print_status "Preparing to build updated UAT images without removing existing ones..."
 
-# Rebuild containers
+# Rebuild containers (no-cache)
 print_status "Rebuilding UAT containers..."
 docker compose -f docker-compose.uat.yml build --no-cache
 
-# Start new containers with new images (zero-downtime)
-print_status "Starting new UAT containers with updated images..."
-docker compose -f docker-compose.uat.yml up -d --force-recreate
+# Start/replace containers with updated images (no force recreate)
+print_status "Starting UAT containers with updated images..."
+docker compose -f docker-compose.uat.yml up -d
 
 # Wait for new containers to be ready
 print_status "Waiting for new UAT containers to be healthy..."
 sleep 10
 
-# 2. Restart nginx proxy to apply new robots.txt configurations
-print_status "Restarting nginx proxy to apply new configurations..."
+# 2. Reload nginx proxy (graceful, avoids 502) to apply any config changes
+print_status "Reloading nginx proxy to apply any config changes..."
 cd ../proxy
 if [ -f "docker-compose.proxy.yml" ]; then
-    docker compose -f docker-compose.proxy.yml restart nginx-proxy
-    print_status "✅ Nginx proxy restarted"
+    if docker exec nginx-proxy nginx -s reload 2>/dev/null; then
+        print_status "✅ Nginx proxy reloaded"
+    else
+        print_warning "⚠️  Direct reload failed, attempting HUP signal via compose"
+        docker compose -f docker-compose.proxy.yml kill -s HUP nginx-proxy || print_warning "⚠️  Could not signal nginx-proxy; ensure it is running"
+    fi
 else
-    print_warning "⚠️  Nginx proxy docker-compose.proxy.yml not found. Please restart nginx manually."
+    print_warning "⚠️  Nginx proxy docker-compose.proxy.yml not found. Skipping reload."
 fi
 
 # 3. Verify UAT deployment

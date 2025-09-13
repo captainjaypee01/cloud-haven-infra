@@ -68,30 +68,33 @@ cd prod
 # Zero-downtime deployment approach
 print_status "Starting zero-downtime production deployment..."
 
-# Remove old images to force rebuild
-print_status "Removing old images..."
-docker rmi cloud-haven-api:prod cloud-haven-web:prod 2>/dev/null || true
+# Avoid removing images up-front; build will replace as needed (prevents gaps)
+print_status "Preparing to build updated images without removing existing ones..."
 
-# Rebuild containers
+# Rebuild containers (no-cache)
 print_status "Rebuilding containers..."
 docker compose build --no-cache
 
-# Start new containers with new images (zero-downtime)
-print_status "Starting new containers with updated images..."
-docker compose up -d --force-recreate
+# Start/replace containers with updated images (no force recreate)
+print_status "Starting containers with updated images..."
+docker compose up -d
 
 # Wait for new containers to be ready
 print_status "Waiting for new containers to be healthy..."
 sleep 10
 
-# Restart nginx proxy to apply new configurations
-print_status "Restarting nginx proxy to apply new configurations..."
+# Reload nginx proxy (graceful, avoids 502) to apply any config changes
+print_status "Reloading nginx proxy to apply any config changes..."
 cd ../proxy
 if [ -f "docker-compose.proxy.yml" ]; then
-    docker compose -f docker-compose.proxy.yml restart nginx-proxy
-    print_status "✅ Nginx proxy restarted"
+    if docker exec nginx-proxy nginx -s reload 2>/dev/null; then
+        print_status "✅ Nginx proxy reloaded"
+    else
+        print_warning "⚠️  Direct reload failed, attempting HUP signal via compose"
+        docker compose -f docker-compose.proxy.yml kill -s HUP nginx-proxy || print_warning "⚠️  Could not signal nginx-proxy; ensure it is running"
+    fi
 else
-    print_warning "⚠️  Nginx proxy docker-compose.proxy.yml not found. Please restart nginx manually."
+    print_warning "⚠️  Nginx proxy docker-compose.proxy.yml not found. Skipping reload."
 fi
 
 # 5. Verify deployment
