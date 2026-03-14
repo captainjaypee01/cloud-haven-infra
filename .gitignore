@@ -7,3 +7,8 @@ prod/.env
 dev/.env
 
 proxy/nginx/reverseproxy.conf
+
+# Backup files
+backups/
+*.sql.gz
+*.sql
