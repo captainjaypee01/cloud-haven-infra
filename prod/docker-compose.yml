@@ -16,6 +16,7 @@ services:
         VITE_BUILD_MODE: "production"
     image: cloud-haven-web:prod
     container_name: frontend-prod
+    restart: unless-stopped
     networks: [ webnet ]
 
   backend-prod:
@@ -24,6 +25,7 @@ services:
       dockerfile: Dockerfile
     image: cloud-haven-api:prod
     container_name: backend-prod
+    restart: unless-stopped
     env_file: ./env/prod.backend.env
     depends_on: [ mysql-prod, redis-prod ]
     volumes:
@@ -40,7 +42,7 @@ services:
     command: php artisan queue:work --verbose --tries=3 --timeout=90
     depends_on: [ backend-prod, redis-prod ]
     networks: [ webnet ]
-    restart: always
+    restart: unless-stopped
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -52,11 +54,12 @@ services:
     command: php artisan schedule:work
     depends_on: [ backend-prod, redis-prod ]
     networks: [ webnet ]
-    restart: always
+    restart: unless-stopped
 
   mysql-prod:
     image: mysql:8.4
     container_name: mysql-prod
+    restart: unless-stopped
     env_file: ./env/prod.mysql.env
     volumes:
       - ${MYSQL_PROD_DATA:-${VOLUME_ROOT}/mysql/prod}:/var/lib/mysql
@@ -68,5 +71,6 @@ services:
   redis-prod:
     image: redis:8.2-alpine
     container_name: redis-prod
+    restart: unless-stopped
     networks: [ webnet ]
 
