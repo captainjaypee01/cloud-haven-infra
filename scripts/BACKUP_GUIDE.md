@@ -4,16 +4,20 @@ This guide explains how to create, download, and manage MySQL database backups f
 
 ## Overview
 
-The backup system consists of three main scripts:
-1. **backup-mysql.sh** - Creates backups on the Digital Ocean droplet
-2. **download-backups.sh** - Downloads backups from droplet to local machine
-3. **upload-backups-to-s3.sh** - Uploads backups to AWS S3 (optional)
+Main scripts:
+1. **backup-mysql.sh** - Creates compressed MySQL dumps on the droplet
+2. **backup-config.sh** - Archives application/infra config (`prod/`, `uat/`, `proxy/`, `scripts/`, optional `dev/`) into `config_cloudhaven_*.tar.gz` (excludes `backups/` and `.git/`)
+3. **backup-and-upload-gdrive.sh** - Runs MySQL + config backups, then uploads new files to Google Drive via **rclone**
+4. **upload-backups-to-gdrive.sh** - Upload only (if you already ran the backup scripts)
+5. **download-backups.sh** - Downloads backups from droplet to your PC
+6. **upload-backups-to-s3.sh** - Uploads MySQL dumps to AWS S3 (optional)
 
 ## Prerequisites
 
 - SSH access to your Digital Ocean droplet
 - Docker and Docker Compose installed on the droplet
 - (Optional) AWS CLI configured for cloud storage uploads
+- (Optional) [rclone](https://rclone.org/) for Google Drive uploads from the droplet
 
 ## Quick Start
 
@@ -83,31 +87,76 @@ aws configure
 AWS_BUCKET=your-backup-bucket ./scripts/upload-backups-to-s3.sh both backups/mysql/
 ```
 
+#### Google Drive (from the droplet, automated)
+
+Google does not ship a Linux “Drive sync” CLI like the desktop app. The usual approach is **[rclone](https://rclone.org/)** with a Drive remote you configure once.
+
+1. **Install rclone** on the droplet (see [rclone install](https://rclone.org/install/)).
+2. **Configure a remote** (interactive, one time):
+   ```bash
+   rclone config
+   ```
+   Create a remote (e.g. name `gdrive`), choose Google Drive, and complete the browser OAuth step.
+3. **Pick where files should go** on Drive:
+   - **By path** (folder under “My Drive”): use `REMOTE:path`, e.g. `gdrive:CloudHaven/backups`.
+   - **By folder link** (URL like `https://drive.google.com/drive/folders/FOLDER_ID`): the long id after `/folders/` is the **folder ID**. Point rclone at it in either way:
+     - In `rclone config`, edit the remote → **advanced** → set **`root_folder_id`** to that id, then use `RCLONE_DEST=gdrive:` (same remote name you chose); or
+     - Leave the remote default and set **`RCLONE_FLAGS=--drive-root-folder-id FOLDER_ID`** with **`RCLONE_DEST=gdrive:`**. If you already use `RCLONE_FLAGS` (e.g. `--bwlimit`), put several flags in one quoted value, e.g. `RCLONE_FLAGS="--drive-root-folder-id FOLDER_ID --bwlimit 8M"`.
+4. **Store settings for cron** (do not commit secrets; copy from the example file):
+   ```bash
+   cp scripts/backup-cron.env.example /root/.config/cloud-haven-backup.env
+   # Edit: set RCLONE_DEST=gdrive:YourFolder/backups
+   ```
+5. **Dry run backups without upload**:
+   ```bash
+   cd /opt/code/cloud-haven-infra
+   chmod +x scripts/*.sh
+   SKIP_GDRIVE_UPLOAD=1 ./scripts/backup-and-upload-gdrive.sh both
+   ```
+6. **Test upload** (uploads files in `backups/` modified in the last 30 hours by default):
+   ```bash
+   export RCLONE_DEST=gdrive:CloudHaven/backups
+   ./scripts/upload-backups-to-gdrive.sh
+   ```
+
+`upload-backups-to-gdrive.sh` uploads:
+
+- `prod_*.sql.gz`, `uat_*.sql.gz`
+- `config_cloudhaven_*.tar.gz` (from `backup-config.sh`)
+
+To upload **everything** matching those patterns (e.g. first migration), run once with `GDRIVE_UPLOAD_ALL=1`. To change the “recent files” window, set `GDRIVE_UPLOAD_MAX_AGE_MINUTES` (default `1800` = 30 hours so daily cron still picks yesterday if the job is delayed).
+
 #### Manual Cloud Storage Upload
 
-You can also manually upload the backup files from `backups/downloaded/` to:
-- Google Drive
-- Dropbox
-- OneDrive
-- Any other cloud storage service
+You can also manually upload files from `backups/` or `backups/downloaded/` to Dropbox, OneDrive, etc.
 
 ## Automated Backups
 
-### Using Cron (Recommended)
-
-Set up automated daily backups on your droplet:
+### MySQL only (cron)
 
 ```bash
-# Edit crontab
 crontab -e
-
-# Add this line for daily backups at 2 AM
+# Daily at 2 AM
 0 2 * * * cd /opt/code/cloud-haven-infra && ./scripts/backup-mysql.sh both >> /var/log/mysql-backup.log 2>&1
 ```
 
+### MySQL + config archive + Google Drive (cron)
+
+This runs database dumps, a **config tarball** (Compose files, `env/*.env`, proxy, scripts), then **rclone** upload of files touched in the last ~30 hours (so old dumps on disk are not re-uploaded every night).
+
+```bash
+crontab -e
+# Daily at 3 AM — load env then run orchestrator
+0 3 * * * set -a; . /root/.config/cloud-haven-backup.env; set +a; cd /opt/code/cloud-haven-infra && ./scripts/backup-and-upload-gdrive.sh both >> /var/log/cloud-haven-backup.log 2>&1
+```
+
+### What is *not* in `backup-config.sh`
+
+The config archive is everything under **this repo on the server** (`prod/`, `uat/`, `proxy/`, `scripts/`, etc.). It does **not** automatically include unrelated host paths (for example system-wide nginx under `/etc/nginx` if you installed nginx outside Docker). If you rely on host-level config, document it and either add it to your own tar step or move that config into the repo/proxy layout you deploy.
+
 ### Backup Retention
 
-The backup script automatically deletes backups older than 7 days. To change this, edit `backup-mysql.sh` and modify:
+MySQL dumps and `config_cloudhaven_*.tar.gz` archives older than **7 days** are removed on the droplet by `backup-mysql.sh` and `backup-config.sh` (config retention uses `BACKUP_CONFIG_RETENTION_DAYS`, default 7). To change MySQL retention, edit `backup-mysql.sh` and modify:
 
 ```bash
 find "$BACKUP_DIR" -name "${env}_${DB_NAME}_*.sql.gz" -mtime +7 -delete
@@ -117,13 +166,20 @@ Change `+7` to your desired retention period (e.g., `+30` for 30 days).
 
 ## Backup File Naming
 
-Backups are named with the following format:
+MySQL dumps:
+
 ```
 {environment}_{database_name}_{timestamp}.sql.gz
 
 Examples:
 - prod_cloudhaven_prod_20240115_020000.sql.gz
 - uat_cloudhaven_uat_20240115_020000.sql.gz
+```
+
+Config / application archive:
+
+```
+config_cloudhaven_{timestamp}.tar.gz
 ```
 
 ## Restoring Backups
@@ -197,8 +253,9 @@ If backups are very large, consider:
 
 | Location | Path | Purpose |
 |----------|------|---------|
-| Droplet | `/opt/code/cloud-haven-infra/backups/` | Primary backup storage |
-| Local | `cloud-haven-infra/backups/downloaded/` | Local copies |
+| Droplet | `/opt/code/cloud-haven-infra/backups/` | SQL dumps + `config_cloudhaven_*.tar.gz` |
+| Local | `cloud-haven-infra/backups/downloaded/` | Local copies (download script) |
+| Google Drive | Folder you set in `RCLONE_DEST` | Off-site copy (rclone) |
 | S3 | `s3://your-bucket/backups/mysql/` | Cloud archive (optional) |
 
 ## Security Notes
