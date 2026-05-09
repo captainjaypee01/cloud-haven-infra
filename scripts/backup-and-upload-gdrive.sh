@@ -6,7 +6,7 @@
 #   ./scripts/backup-and-upload-gdrive.sh [prod|uat|both]
 #
 # Environment:
-#   RCLONE_DEST          Required for upload. Example: gdrive:CloudHaven/backups
+#   RCLONE_DEST          Required for upload. Example: gdrive_cloudhaven:Portfolio/Freelance Projects/Cloud Haven/BACKUP
 #   SKIP_GDRIVE_UPLOAD   If set to 1, only run local backups (no rclone).
 #   RCLONE_FLAGS         Optional extra rclone flags (see upload-backups-to-gdrive.sh)
 
@@ -24,7 +24,7 @@ if [ "${SKIP_GDRIVE_UPLOAD:-0}" = "1" ]; then
 fi
 
 if [ -z "${RCLONE_DEST:-}" ]; then
-    echo "Error: set RCLONE_DEST for Google Drive upload (e.g. export RCLONE_DEST=gdrive:CloudHaven/backups)" >&2
+    echo "Error: set RCLONE_DEST for Google Drive upload (e.g. export RCLONE_DEST='gdrive_cloudhaven:Portfolio/Freelance Projects/Cloud Haven/BACKUP')" >&2
     echo "Or set SKIP_GDRIVE_UPLOAD=1 to only create local backups." >&2
     exit 1
 fi
