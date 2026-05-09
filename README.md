@@ -16,30 +16,78 @@ docker compose -f docker-compose.yml up -d
 ```
 
 
-## 9) Enable HTTPS with Let’s Encrypt
-**Stop the proxy** to free port 80 for the challenge, request certs, then start proxy.
+## 9) Enable HTTPS with Let’s Encrypt (webroot + Docker proxy)
+
+Renewals use **HTTP-01 via webroot** so `nginx-proxy` keeps port 80; no stopping the container for `certbot renew`.
+
+### One-time: directories and permissions (as user `deploy`)
+
 ```bash
-cd /opt/cloud-haven-infra/prod
+mkdir -p /home/deploy/acme-webroot \
+         /home/deploy/letsencrypt/lib \
+         /home/deploy/letsencrypt/log \
+         /home/deploy/logs
 
-# stop proxy temporarily
-docker stop nginx-proxy
-
-# obtain certs (adjust domains)
-sudo apt-get install -y certbot
-sudo certbot certonly --standalone \
-  -d netaniadelaiya.com -d www.netaniadelaiya.com \
-  -d api.netaniadelaiya.com -d uat.netaniadelaiya.com -d uat-api.netaniadelaiya.com
-
-# start proxy and reload
-docker start nginx-proxy
-docker exec -t nginx-proxy nginx -s reload
+# post-hook reloads Nginx in Docker — deploy must use the Docker socket without sudo
+sudo usermod -aG docker deploy
+# log out and back in (or `newgrp docker`)
 ```
-The proxy config already has the 80→443 redirects and `ssl_certificate` paths. After issuance, HTTPS should work immediately.
 
-> **Auto‑renew:** create a monthly cron:
-> ```bash
-> (crontab -l 2>/dev/null; echo "0 3 * * 0 certbot renew --post-hook 'docker exec nginx-proxy nginx -s reload' >/var/log/certbot-renew.log 2>&1") | crontab -
-> ```
+If you **already have** certs under **`/etc/letsencrypt`** (from earlier `sudo certbot`), copy them into deploy’s tree so the compose mount matches (short maintenance window):
+
+```bash
+sudo rsync -a /etc/letsencrypt/ /home/deploy/letsencrypt/
+sudo chown -R deploy:deploy /home/deploy/letsencrypt /home/deploy/acme-webroot
+```
+
+Old renewals may still reference **`standalone`**; after migrating, run **`certbot certonly --webroot ...`** once (same `-d` list as the cert) so `renewal/*.conf` switches to webroot. Only include **`-d` names that resolve to this host for HTTP** on port 80; if UAT subdomains are commented out in Nginx, either add ACME `location` blocks for those `listen 80` servers when you enable UAT or omit them from the certificate.
+
+### Proxy compose volumes
+
+`proxy/docker-compose.proxy.yml` mounts:
+
+- `/home/deploy/letsencrypt` → `/etc/letsencrypt` inside the container (unchanged paths in `ssl_certificate` in Nginx).
+- `/home/deploy/acme-webroot` → `/var/www/certbot` for `/.well-known/acme-challenge/`.
+
+Bring the proxy up after editing compose:
+
+```bash
+cd /opt/code/cloud-haven-infra/proxy   # or your path
+docker compose -f docker-compose.proxy.yml up -d
+```
+
+### Issue or re-issue a certificate (as `deploy`, adjust `-d` list to match your cert)
+
+```bash
+certbot certonly --webroot \
+  -w /home/deploy/acme-webroot \
+  --config-dir /home/deploy/letsencrypt \
+  --work-dir /home/deploy/letsencrypt/lib \
+  --logs-dir /home/deploy/letsencrypt/log \
+  -d netaniadelaiya.com -d www.netaniadelaiya.com -d api.netaniadelaiya.com \
+  -d uat.netaniadelaiya.com -d uat-api.netaniadelaiya.com
+
+docker exec nginx-proxy nginx -s reload
+```
+
+Dry-run renewals:
+
+```bash
+certbot renew --dry-run \
+  --config-dir /home/deploy/letsencrypt \
+  --work-dir /home/deploy/letsencrypt/lib \
+  --logs-dir /home/deploy/letsencrypt/log
+```
+
+### Auto-renew (crontab **as `deploy`**)
+
+```bash
+crontab -e
+```
+
+```cron
+0 3 * * 0 certbot renew --config-dir /home/deploy/letsencrypt --work-dir /home/deploy/letsencrypt/lib --logs-dir /home/deploy/letsencrypt/log --post-hook 'docker exec nginx-proxy nginx -s reload' >> /home/deploy/logs/certbot-renew.log 2>&1
+```
 
 
 # ensure required dirs exist in the mounted volume and set correct owner (www-data uid=33)
@@ -77,10 +125,11 @@ docker logs --tail=200 nginx-proxy
 cd /opt/code/cloud-haven-infra/proxy
 docker compose -f docker-compose.proxy.yml up nginx-proxy
 
-# validate config without starting the service
+# validate config without starting the service (paths must match docker-compose.proxy.yml mounts)
 docker run --rm \
   -v /opt/code/cloud-haven-infra/proxy/nginx/reverseproxy.prod.only.conf:/etc/nginx/conf.d/default.conf:ro \
-  -v /etc/letsencrypt:/etc/letsencrypt:ro \
+  -v /home/deploy/letsencrypt:/etc/letsencrypt:ro \
+  -v /home/deploy/acme-webroot:/var/www/certbot:ro \
   nginx:1.28-alpine nginx -t
 
 ```

@@ -12,7 +12,10 @@ services:
     restart: unless-stopped
     volumes:
       - ./nginx/reverseproxy.dynamic.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # TLS material on host; Nginx sees /etc/letsencrypt inside the container (see README)
+      - /home/deploy/letsencrypt:/etc/letsencrypt:ro
+      # HTTP-01 webroot: Certbot writes on host at /home/deploy/acme-webroot → /var/www/certbot in container
+      - /home/deploy/acme-webroot:/var/www/certbot:ro
     ports:
       - "80:80"
       - "443:443"
